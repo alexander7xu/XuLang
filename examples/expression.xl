@@ -1,0 +1,18 @@
+ast := Import('./') {
+    ast := String('ast.xl')
+}
+
+
+Expression := Class(ast.ast.Ast) {}
+
+Name := Class(Expression) {
+    id := String()
+    parent := Ptr(Name)
+    deref := Int8()
+
+    __Create__ := Function(Name, this, id:=String(), parent:=Ptr(Name, VOID), deref:=Int8(0)) {
+        this->id = id
+        this->parent = parent
+        this->deref = deref
+    }
+}

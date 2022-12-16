@@ -1,0 +1,4 @@
+main := Function() {
+   Print('Hello World')
+   return Int(0)
+}

@@ -1,0 +1,11 @@
+SourceCodeLocator := Struct() {
+    line_beg := int()
+    col_beg := int()
+    line_end := int()
+    col_end := int()
+    file_idx := int()
+}
+
+Ast := Class() {
+    src_loc := SourceCodeLocator()
+}

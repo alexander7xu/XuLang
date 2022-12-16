@@ -1,0 +1,24 @@
+OutOfRange := Class(Error) {}
+
+access := Function(Auto, array:=Array(), idx:=Int()) {
+    if (idx < 0 || idx > array.length()) {
+        raise OutOfRange('Array subscript out of range')
+    }
+    return array[idx]
+}
+
+main := Function(Int) {
+    array := Array(Int, 8)
+    idx := Input()
+
+    res := Int(0)
+    try {
+        res := access(array, idx)
+    } except (err := OutOfRange) {
+        Print(err)
+    } else {
+        Print(res)
+    }
+
+    return Int(0)
+}
