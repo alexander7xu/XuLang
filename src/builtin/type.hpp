@@ -9,39 +9,24 @@ namespace builtin {
 class BasicType {
  public:
   virtual ~BasicType() = default;
-  virtual std::string GetName() const = 0;
+  virtual const char *const GetName() const = 0;
 };
 
 class Int final : public BasicType {
  public:
-  virtual std::string GetName() const override { return "Int"; }
+  virtual const char *const GetName() const override { return "Int"; }
   static constexpr auto BitWidth() { return 64; }
-};
-
-class Uint final : public BasicType {
- public:
-  virtual std::string GetName() const override { return "Uint"; }
 };
 
 class Float final : public BasicType {
  public:
-  virtual std::string GetName() const override { return "Float"; }
+  virtual const char *const GetName() const override { return "Float"; }
   static constexpr auto BitWidth() { return 128; }
-};
-
-class Byte final : public BasicType {
- public:
-  virtual std::string GetName() const override { return "Byte"; }
-};
-
-class Pointer final : public BasicType {
- public:
-  virtual std::string GetName() const override { return "Pointer"; }
 };
 
 class String final : public BasicType {
  public:
-  virtual std::string GetName() const override { return "String"; }
+  virtual const char *const GetName() const override { return "String"; }
 };
 
 };  // namespace builtin
