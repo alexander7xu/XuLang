@@ -25,7 +25,7 @@ template <class T>
 using Sptr = std::shared_ptr<T>;
 
 template <class DstT, class SrcT>
-Sptr<DstT> CastS(const Sptr<SrcT> &sptr) {
+inline Sptr<DstT> CastS(const Sptr<SrcT> &sptr) {
   return std::dynamic_pointer_cast<DstT>(sptr);
 }
 

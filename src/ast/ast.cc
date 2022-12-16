@@ -9,6 +9,10 @@ namespace ast {
   _OVERRIDE_LEAF_ACCEPT(LeafOperator)               \
   const char *LeafOperator::GetName() const { return name; }
 
+#define _OVERRIDE_LEAF_CREATE(LeafCreate) \
+  _OVERRIDE_LEAF_ACCEPT(LeafCreate)       \
+  const TextType *LeafCreate::GetId() const { return id.get(); }
+
 _OVERRIDE_LEAF_ACCEPT(Module)
 _OVERRIDE_LEAF_ACCEPT(Block)
 _OVERRIDE_LEAF_ACCEPT(ExprStatement)
@@ -17,14 +21,15 @@ _OVERRIDE_LEAF_ACCEPT(Continue)
 _OVERRIDE_LEAF_ACCEPT(Return)
 _OVERRIDE_LEAF_ACCEPT(If)
 _OVERRIDE_LEAF_ACCEPT(While)
-_OVERRIDE_LEAF_ACCEPT(ObjCreate)
-_OVERRIDE_LEAF_ACCEPT(Function)
-_OVERRIDE_LEAF_ACCEPT(Assemble)
-_OVERRIDE_LEAF_ACCEPT(Struct)
-_OVERRIDE_LEAF_ACCEPT(Class)
-_OVERRIDE_LEAF_ACCEPT(Import)
 _OVERRIDE_LEAF_ACCEPT(Raise)
 _OVERRIDE_LEAF_ACCEPT(Try)
+
+_OVERRIDE_LEAF_CREATE(ObjCreate)
+_OVERRIDE_LEAF_CREATE(Function)
+_OVERRIDE_LEAF_CREATE(Assemble)
+_OVERRIDE_LEAF_CREATE(Struct)
+_OVERRIDE_LEAF_CREATE(Class)
+_OVERRIDE_LEAF_CREATE(Import)
 
 _OVERRIDE_LEAF_ACCEPT(Literal)
 _OVERRIDE_LEAF_ACCEPT(Name)
