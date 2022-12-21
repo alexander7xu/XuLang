@@ -29,8 +29,12 @@ class Logger final {
                            const std::string &end = "\n") const {
       if (_level < *_logger_level) return;
       std::cerr << _prefix;
-      for (const auto &item : list) std::cerr << item << inter;
-      std::cerr << end << "\e[m";
+
+      auto it = list.begin(), back = list.end() - 1;
+      while (it < back) {
+        std::cerr << *(it++) << inter;
+      }
+      if (it == back) std::cerr << *it << end << "\e[m";
     }
   };
 
@@ -47,13 +51,13 @@ class Logger final {
   const LogFunc Debug =  // Blue
       LogFunc(kLevelDebug, &_level, _name + ".DEBUG", 94);
   const LogFunc Info =  // White
-      LogFunc(kLevelDebug, &_level, _name + ".INFO", 99);
+      LogFunc(kLevelInfo, &_level, _name + ".INFO", 99);
   const LogFunc Warning =  // Yellow
-      LogFunc(kLevelDebug, &_level, _name + ".WARNING", 93);
+      LogFunc(kLevelWarning, &_level, _name + ".WARNING", 93);
   const LogFunc Error =  // Red
-      LogFunc(kLevelDebug, &_level, _name + ".ERROR", 91);
+      LogFunc(kLevelError, &_level, _name + ".ERROR", 91);
   const LogFunc Critical =  // Magenta
-      LogFunc(kLevelDebug, &_level, _name + ".CRITICAL", 95);
+      LogFunc(kLevelCritical, &_level, _name + ".CRITICAL", 95);
 
  public:
   inline static constexpr int kLevelDefault = 0;

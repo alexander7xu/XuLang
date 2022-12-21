@@ -7,4 +7,14 @@ z := Function() {
         i := Float(0.1)
         j := Float(0.2)
     }
+
+    d := Function() {
+        m := String('abc')
+        n := String('def')
+    }
+}
+
+u := Function() {
+    v := Function() {}
+    w := Function() {}
 }

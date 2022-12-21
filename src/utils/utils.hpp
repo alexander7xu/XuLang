@@ -15,8 +15,8 @@ namespace utils {
 #define FOR_EACH(macro, ...) \
   __VA_OPT__(_EXPAND(_FOR_EACH_HELPER(macro, __VA_ARGS__)))
 
-#define SRC_LOC \
-  (__FILE__ + std::to_string(__LINE__) + " @ " + __PRETTY_FUNCTION__)
+#define SRC_LOC (std::string(__FILE__) + ":" + std::to_string(__LINE__))
+#define SRC_FUNC __PRETTY_FUNCTION__
 
 template <class T>
 using Uptr = std::unique_ptr<T>;

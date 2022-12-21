@@ -17,7 +17,7 @@ void yyerror(const char *s) {
     kLog->Error({"file \"" + kFilenames.top() + "\"", std::string(yylloc)+":", s});
 }
 
-static void LogDebug() {
+static void LogAction() {
     std::string text;
     for (const auto &c : std::string(yytext, yyleng)) {
         if (c == '\n') text += "<LF>";
@@ -26,7 +26,8 @@ static void LogDebug() {
         else if (c == ' ') text += "<SPACE>";
         else text += c;
     }
-    kLog->Debug({"File", kFilenames.top(), std::string(yylloc), text});
+    auto loc = std::string(yylloc);
+    kLog->Info({"File", kFilenames.top(), loc + std::string(16 - loc.size(), ' '), text});
 }
 
 #define YY_USER_ACTION                                                \
@@ -40,7 +41,7 @@ static void LogDebug() {
     yylloc.col_end = yycolumn + (int)yyleng;                          \
     yycolumn += (int)yyleng;                                          \
     yylloc.file_idx = static_cast<int>(kFilenames.size()) - 1;        \
-    LogDebug();
+    LogAction();
 %}
 
 %option yylineno
