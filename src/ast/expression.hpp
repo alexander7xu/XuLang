@@ -11,9 +11,9 @@ class Expression : public Node {};
 class Literal final : public Expression {
  public:
   Uptr<TextType> val;
-  Uptr<builtin::BasicType> type;
-  Literal(Uptr<TextType> &&val, Uptr<builtin::BasicType> &&basic_type)
-      : val(std::move(val)), type(std::move(basic_type)) {}
+  const builtin::BasicType &type;
+  Literal(Uptr<TextType> &&val, const builtin::BasicType &basic_type)
+      : val(std::move(val)), type(basic_type) {}
   virtual void Accept(VisitorInterface *) override;
 };
 

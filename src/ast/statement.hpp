@@ -90,13 +90,13 @@ class While final : public Statement {
   virtual void Accept(VisitorInterface *) override;
 };
 
-// e.g. obj_name := Type(expr)
+// e.g. obj_name := expr
 class ObjCreate final : public Create {
  public:
   Uptr<TextType> id;
-  Uptr<CallExpr> call_expr;
-  ObjCreate(Uptr<TextType> &&id, Uptr<CallExpr> &&call_expr)
-      : id(std::move(id)), call_expr(std::move(call_expr)) {}
+  Uptr<Expression> expr;
+  ObjCreate(Uptr<TextType> &&id, Uptr<Expression> &&expr)
+      : id(std::move(id)), expr(std::move(expr)) {}
   virtual const TextType *GetId() const override;
   virtual void Accept(VisitorInterface *) override;
 };

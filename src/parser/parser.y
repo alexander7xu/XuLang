@@ -86,7 +86,7 @@
 %type <TryP>                _beg_try
 %type <NameP>               name
 %type <CallExprP>           call
-%type <CallOperatorP>       op_call _unamed_args _named_args
+%type <CallOperatorP>       op_call _unamed_args _type_args _named_args
 %type <SubscriptOperatorP>  op_subscript _subscript_list
 %type <SubscriptArgP>       _subscript_arg
 
@@ -137,7 +137,7 @@ stmt        : create { $$ = $1; }
             | try
             | expr { $$ = new ast::ExprStatement(MVU($1)); }
             ;
-obj_create  : TK_IDENTIFIER TK_CREATE call { $$ = new ast::ObjCreate(MVU($1), MVU($3)); }
+obj_create  : TK_IDENTIFIER TK_CREATE expr { $$ = new ast::ObjCreate(MVU($1), MVU($3)); }
             ;
 break       : TK_BREAK { $$ = new ast::Break(); }
             ;
@@ -200,9 +200,9 @@ name        : expr TK_MEMBER TK_IDENTIFIER
                 { $$ = new ast::Name(MVU($3), true, MVU($1)); }
             | TK_IDENTIFIER { $$ = new ast::Name(MVU($1)); }
             ;
-literal     : TK_INTEGER { $$ = new ast::Literal(MVU($1), UNEW(builtin::Int())); }
-            | TK_FLOAT { $$ = new ast::Literal(MVU($1), UNEW(builtin::Float())); }
-            | TK_STRING { $$ = new ast::Literal(MVU($1), UNEW(builtin::String())); }
+literal     : TK_INTEGER { $$ = new ast::Literal(MVU($1), builtin::kInt); }
+            | TK_FLOAT { $$ = new ast::Literal(MVU($1), builtin::kFloat); }
+            | TK_STRING { $$ = new ast::Literal(MVU($1), builtin::kString); }
             ;
 call        : expr op_call { $$ = new ast::CallExpr(MVU($1), MVU($2)); }
             ;
@@ -213,14 +213,14 @@ if_else     : expr TK_IF expr TK_ELSE expr
             ;
 
 op_call     : TK_PAREN_L _named_args TK_PAREN_R { $$ = $2; }
-            | TK_PAREN_L _unamed_args TK_PAREN_R { $$ = $2; }
             ;
 _named_args : _named_args TK_COMMA TK_IDENTIFIER TK_CREATE expr
                 { $1->AddKeyword(MVU($3), MVU($5)); }
-            | _unamed_args TK_COMMA TK_IDENTIFIER TK_CREATE expr
-                { $1->AddKeyword(MVU($3), MVU($5)); }
-            | TK_IDENTIFIER TK_CREATE expr
-                { $$ = new ast::CallOperator(); $$->AddKeyword(MVU($1), MVU($3)); } 
+            | _type_args { $$ = $1; }
+            ;
+_type_args  : _type_args TK_COMMA TK_IDENTIFIER TK_COLON name
+                { $1->AddTypeArg(MVU($3), MVU($5)); }
+            | _unamed_args { $$ = $1; }
             ;
 _unamed_args: _unamed_args TK_COMMA expr { $1->AddUnamed(MVU($3)); }
             | expr { $$ = new ast::CallOperator(); $$->AddUnamed(MVU($1)); }

@@ -26,8 +26,8 @@ class ToJson final : private VisitorInterface {
   }
 
   std::string JsonPair(const std::string &key,
-                       const Uptr<builtin::BasicType> &val) {
-    return std::string("\"") + key + "\":\"" + std::string(val->GetName()) +
+                       const builtin::BasicType &val) {
+    return std::string("\"") + key + "\":\"" + val.GetName() +
            "\"";
   }
 
@@ -124,6 +124,16 @@ class ToJson final : private VisitorInterface {
       unamed += "]";
     }
 
+    auto type_args = std::string("[");
+    for (const auto &x : cop->type_args) {
+      type_args += JsonPair(*std::get<0>(x), std::get<1>(x)) + ",";
+    }
+    if (type_args.length() > 1) {
+      type_args[type_args.length() - 1] = '}';
+    } else {
+      type_args += "}";
+    }
+
     auto named = std::string("{");
     for (const auto &x : cop->keywords) {
       named += JsonPair(*std::get<0>(x), std::get<1>(x)) + ",";
@@ -138,6 +148,7 @@ class ToJson final : private VisitorInterface {
     res += JsonPair("class", std::string("CallOperator")) + ",";
     res += JsonPair("name", std::string(cop->GetName())) + ",";
     res += JsonPair("unamed", unamed) + ",";
+    res += JsonPair("type_args", type_args) + ",";
     res += JsonPair("keywords", named);
     _visit_result = res + "}";
   }
@@ -181,7 +192,7 @@ class ToJson final : private VisitorInterface {
   _LEAF_TO_JSON_FUNC(Return, expr)
   _LEAF_TO_JSON_FUNC(If, test, body, orelse)
   _LEAF_TO_JSON_FUNC(While, test, body, orelse)
-  _LEAF_TO_JSON_FUNC(ObjCreate, id, call_expr)
+  _LEAF_TO_JSON_FUNC(ObjCreate, id, expr)
   _LEAF_TO_JSON_FUNC(Function, id, args, body)
   _LEAF_TO_JSON_FUNC(Assemble, id, args, body)
   _LEAF_TO_JSON_FUNC(Struct, id, body)

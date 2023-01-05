@@ -20,9 +20,13 @@ class UnaryOperator : public Operator {};
 class BinaryOperator : public Operator {};
 class LogicOperator : public Operator {};
 
+// e.g.
+// x := Function(unameds0, u:type_args0, v:type_args1, x:=keywords0) {}
+// x(unameds0, v:=keywords0)
 class CallOperator final : public Operator {
  public:
   std::list<Uptr<Expression>> unameds;
+  std::list<std::tuple<Uptr<TextType>, Uptr<Name>>> type_args;
   std::list<std::tuple<Uptr<TextType>, Uptr<Expression>>> keywords;
 
   CallOperator() = default;
@@ -31,6 +35,9 @@ class CallOperator final : public Operator {
 
   inline void AddUnamed(Uptr<Expression> &&unamed) {
     unameds.push_back(std::move(unamed));
+  }
+  void AddTypeArg(Uptr<TextType> &&id, Uptr<Name> &&type) {
+    type_args.push_back({std::move(id), std::move(type)});
   }
   inline void AddKeyword(Uptr<TextType> &&name, Uptr<Expression> &&val) {
     keywords.push_back(std::make_tuple(std::move(name), std::move(val)));
