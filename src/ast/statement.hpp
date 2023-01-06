@@ -8,7 +8,7 @@ namespace ast {
 class Statement : public Node {};
 class Create : public Statement {
  public:
-  virtual const TextType *GetId() const = 0;
+  virtual const TextType &GetId() const = 0;
 };
 
 class Module final : public Statement {
@@ -97,7 +97,7 @@ class ObjCreate final : public Create {
   Uptr<Expression> expr;
   ObjCreate(Uptr<TextType> &&id, Uptr<Expression> &&expr)
       : id(std::move(id)), expr(std::move(expr)) {}
-  virtual const TextType *GetId() const override;
+  virtual const TextType &GetId() const override;
   virtual void Accept(VisitorInterface *) override;
 };
 
@@ -109,7 +109,7 @@ class Function final : public Create {
   Uptr<Block> body;
   Function(Uptr<TextType> &&id, Uptr<CallOperator> &&args, Uptr<Block> &&body)
       : id(std::move(id)), args(std::move(args)), body(std::move(body)) {}
-  virtual const TextType *GetId() const override;
+  virtual const TextType &GetId() const override;
   virtual void Accept(VisitorInterface *) override;
 };
 
@@ -121,7 +121,7 @@ class Assemble final : public Create {
   Uptr<Block> body;
   Assemble(Uptr<TextType> &&id, Uptr<CallOperator> &&args, Uptr<Block> &&body)
       : id(std::move(id)), args(std::move(args)), body(std::move(body)) {}
-  virtual const TextType *GetId() const override;
+  virtual const TextType &GetId() const override;
   virtual void Accept(VisitorInterface *) override;
 };
 
@@ -132,7 +132,7 @@ class Struct final : public Create {
   Uptr<Block> body;
   Struct(Uptr<TextType> &&id, Uptr<Block> &&body)
       : id(std::move(id)), body(std::move(body)) {}
-  virtual const TextType *GetId() const override;
+  virtual const TextType &GetId() const override;
   virtual void Accept(VisitorInterface *) override;
 };
 
@@ -144,7 +144,7 @@ class Class final : public Create {
   Uptr<Block> body;
   Class(Uptr<TextType> &&id, Uptr<CallOperator> &&parents, Uptr<Block> &&body)
       : id(std::move(id)), parents(std::move(parents)), body(std::move(body)) {}
-  virtual const TextType *GetId() const override;
+  virtual const TextType &GetId() const override;
   virtual void Accept(VisitorInterface *) override;
 };
 
@@ -159,7 +159,7 @@ class Import final : public Create {
       : id(std::move(id)),
         module_root(std::move(module_root)),
         files(std::move(files)) {}
-  virtual const TextType *GetId() const override;
+  virtual const TextType &GetId() const override;
   virtual void Accept(VisitorInterface *) override;
 };
 

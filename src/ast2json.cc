@@ -204,6 +204,7 @@ class ToJson final : private VisitorInterface {
   _LEAF_TO_JSON_FUNC(Name, id, deref, parent)
   _LEAF_TO_JSON_FUNC(UnaryOpExpr, op, right)
   _LEAF_TO_JSON_FUNC(BinaryOpExpr, op, left, right)
+  _LEAF_TO_JSON_FUNC(AssignOpExpr, op, target, expr)
   _LEAF_TO_JSON_FUNC(LogicExpr, op, left, right)
   _LEAF_TO_JSON_FUNC(IfElseExpr, test, left, right)
   _LEAF_TO_JSON_FUNC(CallExpr, obj, op)

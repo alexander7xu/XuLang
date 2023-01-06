@@ -11,7 +11,7 @@ namespace ast {
 
 #define _OVERRIDE_LEAF_CREATE(LeafCreate) \
   _OVERRIDE_LEAF_ACCEPT(LeafCreate)       \
-  const TextType *LeafCreate::GetId() const { return id.get(); }
+  const TextType &LeafCreate::GetId() const { return *id; }
 
 _OVERRIDE_LEAF_ACCEPT(Module)
 _OVERRIDE_LEAF_ACCEPT(Block)
@@ -35,6 +35,7 @@ _OVERRIDE_LEAF_ACCEPT(Literal)
 _OVERRIDE_LEAF_ACCEPT(Name)
 _OVERRIDE_LEAF_ACCEPT(UnaryOpExpr)
 _OVERRIDE_LEAF_ACCEPT(BinaryOpExpr)
+_OVERRIDE_LEAF_ACCEPT(AssignOpExpr)
 _OVERRIDE_LEAF_ACCEPT(LogicExpr)
 _OVERRIDE_LEAF_ACCEPT(IfElseExpr)
 _OVERRIDE_LEAF_ACCEPT(CallExpr)

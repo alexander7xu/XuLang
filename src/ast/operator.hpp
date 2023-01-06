@@ -18,6 +18,7 @@ class Operator : public Node {
 
 class UnaryOperator : public Operator {};
 class BinaryOperator : public Operator {};
+class AssignOperator : public Operator {};
 class LogicOperator : public Operator {};
 
 // e.g.
@@ -68,6 +69,7 @@ class SubscriptOperator final : public Operator {
   }
 
 #define _BOP_CHILD_CLASS(class_name) _OP_CHILD_CLASS(class_name, BinaryOperator)
+#define _AOP_CHILD_CLASS(class_name) _OP_CHILD_CLASS(class_name, AssignOperator)
 #define _LOP_CHILD_CLASS(class_name) _OP_CHILD_CLASS(class_name, LogicOperator)
 #define _UOP_CHILD_CLASS(class_name) _OP_CHILD_CLASS(class_name, UnaryOperator)
 
@@ -82,17 +84,17 @@ class _BOP_CHILD_CLASS(OpBitAnd);
 class _BOP_CHILD_CLASS(OpShiftL);
 class _BOP_CHILD_CLASS(OpShiftR);
 
-class _BOP_CHILD_CLASS(OpAssign);
-class _BOP_CHILD_CLASS(OpSelfPlus);
-class _BOP_CHILD_CLASS(OpSelfMinus);
-class _BOP_CHILD_CLASS(OpSelfMul);
-class _BOP_CHILD_CLASS(OpSelfDiv);
-class _BOP_CHILD_CLASS(OpSelfMod);
-class _BOP_CHILD_CLASS(OpSelfBitXor);
-class _BOP_CHILD_CLASS(OpSelfBitOr);
-class _BOP_CHILD_CLASS(OpSelfBitAnd);
-class _BOP_CHILD_CLASS(OpSelfShiftL);
-class _BOP_CHILD_CLASS(OpSelfShiftR);
+class _AOP_CHILD_CLASS(OpAssign);
+class _AOP_CHILD_CLASS(OpSelfPlus);
+class _AOP_CHILD_CLASS(OpSelfMinus);
+class _AOP_CHILD_CLASS(OpSelfMul);
+class _AOP_CHILD_CLASS(OpSelfDiv);
+class _AOP_CHILD_CLASS(OpSelfMod);
+class _AOP_CHILD_CLASS(OpSelfBitXor);
+class _AOP_CHILD_CLASS(OpSelfBitOr);
+class _AOP_CHILD_CLASS(OpSelfBitAnd);
+class _AOP_CHILD_CLASS(OpSelfShiftL);
+class _AOP_CHILD_CLASS(OpSelfShiftR);
 
 class _LOP_CHILD_CLASS(OpOr);
 class _LOP_CHILD_CLASS(OpAnd);

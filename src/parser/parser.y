@@ -76,7 +76,7 @@
 %type <StatementP>  break continue return raise
 %type <StatementP>  if while try
 %type <ExpressionP> expr
-%type <ExpressionP> literal uop_expr bop_expr logic_expr
+%type <ExpressionP> literal uop_expr bop_expr aop_expr logic_expr
 %type <ExpressionP> subscript if_else
 %type <CreateP>     create obj_create function assemble struct class import
 
@@ -188,6 +188,7 @@ expr        : literal
             | name  { $$ = $1; }
             | uop_expr
             | bop_expr
+            | aop_expr
             | logic_expr
             | call { $$ = $1; }
             | subscript
@@ -274,17 +275,17 @@ bop_expr    : expr TK_PLUS expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::
             | expr TK_SHIFT_L expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpShiftL()), MVU($3)); }
             | expr TK_SHIFT_R expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpShiftR()), MVU($3)); }
 
-            | expr TK_ASSIGN expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpAssign()), MVU($3)); }
-            | expr TK_SELF_PLUS expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpSelfPlus()), MVU($3)); }
-            | expr TK_SELF_MINUS expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpSelfMinus()), MVU($3)); }
-            | expr TK_SELF_MUL expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpSelfMul()), MVU($3)); }
-            | expr TK_SELF_DIV expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpSelfMod()), MVU($3)); }
-            | expr TK_SELF_MOD expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpSelfDiv()), MVU($3)); }
-            | expr TK_SELF_BXOR expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpSelfBitXor()), MVU($3)); }
-            | expr TK_SELF_BOR expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpSelfBitOr()), MVU($3)); }
-            | expr TK_SELF_BAND expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpSelfBitAnd()), MVU($3)); }
-            | expr TK_SELF_SHIFT_L expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpSelfShiftL()), MVU($3)); }
-            | expr TK_SELF_SHIFT_R expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpSelfShiftR()), MVU($3)); }
+aop_expr    : expr TK_ASSIGN expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpAssign()), MVU($3)); }
+            | expr TK_SELF_PLUS expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfPlus()), MVU($3)); }
+            | expr TK_SELF_MINUS expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfMinus()), MVU($3)); }
+            | expr TK_SELF_MUL expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfMul()), MVU($3)); }
+            | expr TK_SELF_DIV expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfMod()), MVU($3)); }
+            | expr TK_SELF_MOD expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfDiv()), MVU($3)); }
+            | expr TK_SELF_BXOR expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfBitXor()), MVU($3)); }
+            | expr TK_SELF_BOR expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfBitOr()), MVU($3)); }
+            | expr TK_SELF_BAND expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfBitAnd()), MVU($3)); }
+            | expr TK_SELF_SHIFT_L expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfShiftL()), MVU($3)); }
+            | expr TK_SELF_SHIFT_R expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfShiftR()), MVU($3)); }
             ;
 
 logic_expr  : expr TK_OR expr { $$ = new ast::LogicExpr(MVU($1), UNEW(ast::OpOr()), MVU($3)); }

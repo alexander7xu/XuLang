@@ -49,6 +49,17 @@ class BinaryOpExpr final : public Expression {
   virtual void Accept(VisitorInterface *) override;
 };
 
+class AssignOpExpr final : public Expression {
+ public:
+  Uptr<Expression> target;
+  Uptr<AssignOperator> op;
+  Uptr<Expression> expr;
+  AssignOpExpr(Uptr<Expression> &&target, Uptr<AssignOperator> &&op,
+               Uptr<Expression> &&expr)
+      : target(std::move(target)), op(std::move(op)), expr(std::move(expr)) {}
+  virtual void Accept(VisitorInterface *) override;
+};
+
 class LogicExpr final : public Expression {
  public:
   Uptr<Expression> left;

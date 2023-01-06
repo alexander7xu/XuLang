@@ -30,6 +30,7 @@ class VisitorInterface {
   virtual void Visit(class Name *) = 0;
   virtual void Visit(class UnaryOpExpr *) = 0;
   virtual void Visit(class BinaryOpExpr *) = 0;
+  virtual void Visit(class AssignOpExpr *) = 0;
   virtual void Visit(class LogicExpr *) = 0;
   virtual void Visit(class IfElseExpr *) = 0;
   virtual void Visit(class CallExpr *) = 0;
