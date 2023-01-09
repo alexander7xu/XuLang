@@ -13,26 +13,28 @@ using namespace ast;
 
 class ToJson final : private VisitorInterface {
  private:
-  std::string _visit_result;
+  std::string _result;
 
-  template <class LeafP>
-  std::string JsonPair(const std::string &key, const LeafP &val) {
+  template <class T>
+  std::string JsonPair(const std::string &key, const Uptr<T> &val) {
+    if (val == nullptr) return std::string("\"") + key + "\":\"NULL\"";
+    return JsonPair(key, *val);
+  }
+
+  std::string JsonPair(const std::string &key, const ast::VargOperator &cop) {
+    return JsonPair(key, dynamic_cast<const ast::Node &>(cop));
+  }
+
+  std::string JsonPair(const std::string &key, const ast::Operator &val) {
+    return std::string("\"") + key + "\":\"" + val.GetName() + "\"";
+  }
+
+  std::string JsonPair(const std::string &key, const ast::Node &val) {
     auto res = std::string("\"") + key + "\":";
-    if (val == nullptr) return res + "\"NULL\"";
-    val->Accept(this);
-    auto child = this->GetVisitResult();
+    const_cast<ast::Node &>(val).Accept(this);
+    auto &child = this->_result;
     res += (child[0] == '{' || child[0] == '[') ? child : ('"' + child + '"');
     return res;
-  }
-
-  std::string JsonPair(const std::string &key,
-                       const builtin::BasicType &val) {
-    return std::string("\"") + key + "\":\"" + val.GetName() +
-           "\"";
-  }
-
-  std::string JsonPair(const std::string &key, const Uptr<TextType> &val) {
-    return std::string("\"") + key + "\":\"" + *val + "\"";
   }
 
   std::string JsonPair(const std::string &key, const std::string &val) {
@@ -45,12 +47,10 @@ class ToJson final : private VisitorInterface {
     return std::string("\"") + key + "\":\"" + (val ? "True" : "False") + "\"";
   }
 
-  const std::string &GetVisitResult() const { return _visit_result; }
-
  public:
-  std::string operator()(const Node *node) {
-    const_cast<Node *>(node)->Accept(this);
-    return GetVisitResult();
+  std::string operator()(const Node &node) {
+    const_cast<Node &>(node).Accept(this);
+    return _result;
   }
 
  private:
@@ -58,7 +58,7 @@ class ToJson final : private VisitorInterface {
     auto objs = std::string("[");
     for (const auto &obj : module->objs) {
       obj->Accept(this);
-      objs += this->GetVisitResult() + ",";
+      objs += this->_result + ",";
     }
 
     if (objs.length() > 1) {
@@ -68,17 +68,17 @@ class ToJson final : private VisitorInterface {
     }
 
     auto res = std::string("{");
-    res += JsonPair("class", std::string("Module")) + ",";
+    res += JsonPair("class", "Module") + ",";
     res += JsonPair("filename", module->filename) + ",";
     res += JsonPair("objs", objs);
-    this->_visit_result = res + "}";
+    this->_result = res += "}";
   }
 
   virtual void Visit(Block *block) override {
     auto stmts = std::string("[");
     for (const auto &stmt : block->statements) {
       stmt->Accept(this);
-      stmts += this->GetVisitResult() + ",";
+      stmts += this->_result + ",";
     }
 
     if (stmts.length() > 1) {
@@ -88,9 +88,9 @@ class ToJson final : private VisitorInterface {
     }
 
     auto res = std::string("{");
-    res += JsonPair("class", std::string("Block")) + ",";
+    res += JsonPair("class", "Block") + ",";
     res += JsonPair("statements", stmts);
-    this->_visit_result = res + "}";
+    this->_result = res += "}";
   }
 
   virtual void Visit(Try *try_stmt) override {
@@ -105,18 +105,18 @@ class ToJson final : private VisitorInterface {
     excepts[excepts.length() - 1] = ']';
 
     auto res = std::string("{");
-    res += JsonPair("class", std::string("Try")) + ",";
+    res += JsonPair("class", "Try") + ",";
     res += JsonPair("body", try_stmt->body) + ",";
     res += JsonPair("excepts", excepts) + ",";
     res += JsonPair("orelse", try_stmt->orelse);
-    _visit_result = res + "}";
+    _result = res += "}";
   }
 
   virtual void Visit(CallOperator *cop) override {
     auto unamed = std::string("[");
     for (const auto &x : cop->unameds) {
       x->Accept(this);
-      unamed += this->GetVisitResult() + ",";
+      unamed += this->_result + ",";
     }
     if (unamed.length() > 1) {
       unamed[unamed.length() - 1] = ']';
@@ -124,7 +124,7 @@ class ToJson final : private VisitorInterface {
       unamed += "]";
     }
 
-    auto type_args = std::string("[");
+    auto type_args = std::string("{");
     for (const auto &x : cop->type_args) {
       type_args += JsonPair(*std::get<0>(x), std::get<1>(x)) + ",";
     }
@@ -145,12 +145,12 @@ class ToJson final : private VisitorInterface {
     }
 
     auto res = std::string("{");
-    res += JsonPair("class", std::string("CallOperator")) + ",";
+    res += JsonPair("class", "CallOperator") + ",";
     res += JsonPair("name", std::string(cop->GetName())) + ",";
     res += JsonPair("unamed", unamed) + ",";
     res += JsonPair("type_args", type_args) + ",";
     res += JsonPair("keywords", named);
-    _visit_result = res + "}";
+    _result = res += "}";
   }
 
   virtual void Visit(SubscriptOperator *sop) override {
@@ -162,92 +162,57 @@ class ToJson final : private VisitorInterface {
       dims += JsonPair("step", std::get<2>(*x));
       dims += "},";
     }
-    dims[dims.length() - 1] = ']';
+    if (dims.length() > 1) {
+      dims[dims.length() - 1] = ']';
+    } else {
+      dims += "]";
+    }
 
     auto res = std::string("{");
-    res += JsonPair("class", std::string("SubscriptOperator")) + ",";
+    res += JsonPair("class", "SubscriptOperator") + ",";
     res += JsonPair("dims", dims);
-    _visit_result = res + "}";
+    _result = res += "}";
+  }
+
+  virtual void Visit(Literal *literal) override {
+    auto res = std::string("{");
+    res += JsonPair("class", "Literal") + ",";
+    res += JsonPair("val", literal->val) + ",";
+    res += JsonPair("type", literal->kTypeNames[literal->type]);
+    _result = res += "}";
   }
 
 #define _ADD_JSON_PAIR(name) (res += JsonPair(#name, leaf->name) + ",");
-#define _LEAF_TO_JSON_FUNC(LeafT, ...)                     \
-  virtual void Visit(LeafT *leaf) override {               \
-    auto res = std::string("{");                           \
-    res += JsonPair("class", std::string(#LeafT)) + ",";   \
-    FOR_EACH(_ADD_JSON_PAIR, __VA_ARGS__);                 \
-    _visit_result = res.substr(0, res.length() - 1) + "}"; \
-  }
-#define _OP_LEAF_TO_JSON_FUNC(OpLeafT)                              \
-  virtual void Visit(OpLeafT *leaf) override {                      \
-    auto res = std::string("{");                                    \
-    res += JsonPair("class", std::string(#OpLeafT)) + ",";          \
-    _visit_result =                                                 \
-        res + JsonPair("name", std::string(leaf->GetName())) + "}"; \
+#define _NODE_TO_JSON_FUNC(LeafT, ...)                   \
+  virtual void Visit(LeafT *leaf) override {             \
+    auto res = std::string("{");                         \
+    res += JsonPair("class", std::string(#LeafT)) + ","; \
+    FOR_EACH(_ADD_JSON_PAIR, __VA_ARGS__);               \
+    _result = res.substr(0, res.length() - 1) + "}";     \
   }
 
-  _LEAF_TO_JSON_FUNC(ExprStatement, expr)
-  _LEAF_TO_JSON_FUNC(Break)
-  _LEAF_TO_JSON_FUNC(Continue)
-  _LEAF_TO_JSON_FUNC(Return, expr)
-  _LEAF_TO_JSON_FUNC(If, test, body, orelse)
-  _LEAF_TO_JSON_FUNC(While, test, body, orelse)
-  _LEAF_TO_JSON_FUNC(ObjCreate, id, expr)
-  _LEAF_TO_JSON_FUNC(Function, id, args, body)
-  _LEAF_TO_JSON_FUNC(Assemble, id, args, body)
-  _LEAF_TO_JSON_FUNC(Struct, id, body)
-  _LEAF_TO_JSON_FUNC(Class, id, parents, body)
-  _LEAF_TO_JSON_FUNC(Import, id, module_root, files)
-  _LEAF_TO_JSON_FUNC(Raise, error)
+  _NODE_TO_JSON_FUNC(ExprStatement, expr)
+  _NODE_TO_JSON_FUNC(Break)
+  _NODE_TO_JSON_FUNC(Continue)
+  _NODE_TO_JSON_FUNC(Return, expr)
+  _NODE_TO_JSON_FUNC(If, test, body, orelse)
+  _NODE_TO_JSON_FUNC(While, test, body, orelse)
+  _NODE_TO_JSON_FUNC(ObjCreate, id, expr)
+  _NODE_TO_JSON_FUNC(Function, id, args, body)
+  _NODE_TO_JSON_FUNC(Assemble, id, args, body)
+  _NODE_TO_JSON_FUNC(Struct, id, body)
+  _NODE_TO_JSON_FUNC(Class, id, parents, body)
+  _NODE_TO_JSON_FUNC(Import, id, module_root, files)
+  _NODE_TO_JSON_FUNC(Raise, error)
 
-  _LEAF_TO_JSON_FUNC(Literal, val, type)
-  _LEAF_TO_JSON_FUNC(Name, id, deref, parent)
-  _LEAF_TO_JSON_FUNC(UnaryOpExpr, op, right)
-  _LEAF_TO_JSON_FUNC(BinaryOpExpr, op, left, right)
-  _LEAF_TO_JSON_FUNC(AssignOpExpr, op, target, expr)
-  _LEAF_TO_JSON_FUNC(LogicExpr, op, left, right)
-  _LEAF_TO_JSON_FUNC(IfElseExpr, test, left, right)
-  _LEAF_TO_JSON_FUNC(CallExpr, obj, op)
-  _LEAF_TO_JSON_FUNC(SubscriptExpr, obj, op)
-
-  _OP_LEAF_TO_JSON_FUNC(OpPlus)
-  _OP_LEAF_TO_JSON_FUNC(OpMinus)
-  _OP_LEAF_TO_JSON_FUNC(OpMul)
-  _OP_LEAF_TO_JSON_FUNC(OpDiv)
-  _OP_LEAF_TO_JSON_FUNC(OpMod)
-  _OP_LEAF_TO_JSON_FUNC(OpBitXor)
-  _OP_LEAF_TO_JSON_FUNC(OpBitOr)
-  _OP_LEAF_TO_JSON_FUNC(OpBitAnd)
-  _OP_LEAF_TO_JSON_FUNC(OpShiftL)
-  _OP_LEAF_TO_JSON_FUNC(OpShiftR)
-
-  _OP_LEAF_TO_JSON_FUNC(OpAssign)
-  _OP_LEAF_TO_JSON_FUNC(OpSelfPlus)
-  _OP_LEAF_TO_JSON_FUNC(OpSelfMinus)
-  _OP_LEAF_TO_JSON_FUNC(OpSelfMul)
-  _OP_LEAF_TO_JSON_FUNC(OpSelfDiv)
-  _OP_LEAF_TO_JSON_FUNC(OpSelfMod)
-  _OP_LEAF_TO_JSON_FUNC(OpSelfBitXor)
-  _OP_LEAF_TO_JSON_FUNC(OpSelfBitOr)
-  _OP_LEAF_TO_JSON_FUNC(OpSelfBitAnd)
-  _OP_LEAF_TO_JSON_FUNC(OpSelfShiftL)
-  _OP_LEAF_TO_JSON_FUNC(OpSelfShiftR)
-
-  _OP_LEAF_TO_JSON_FUNC(OpOr)
-  _OP_LEAF_TO_JSON_FUNC(OpAnd)
-  _OP_LEAF_TO_JSON_FUNC(OpEq)
-  _OP_LEAF_TO_JSON_FUNC(OpNe)
-  _OP_LEAF_TO_JSON_FUNC(OpLe)
-  _OP_LEAF_TO_JSON_FUNC(OpGe)
-  _OP_LEAF_TO_JSON_FUNC(OpLt)
-  _OP_LEAF_TO_JSON_FUNC(OpGt)
-
-  _OP_LEAF_TO_JSON_FUNC(OpBitNot)
-  _OP_LEAF_TO_JSON_FUNC(OpNot)
-  _OP_LEAF_TO_JSON_FUNC(OpPositive)
-  _OP_LEAF_TO_JSON_FUNC(OpNegative)
-  _OP_LEAF_TO_JSON_FUNC(OpDeref)
-  _OP_LEAF_TO_JSON_FUNC(OpRef)
+  _NODE_TO_JSON_FUNC(Name, id, deref, parent)
+  _NODE_TO_JSON_FUNC(UnaryOpExpr, op, right)
+  _NODE_TO_JSON_FUNC(BinaryOpExpr, op, left, right)
+  _NODE_TO_JSON_FUNC(AssignOpExpr, op, target, expr)
+  _NODE_TO_JSON_FUNC(LogicExpr, op, left, right)
+  _NODE_TO_JSON_FUNC(IfElseExpr, test, left, right)
+  _NODE_TO_JSON_FUNC(CallExpr, obj, op)
+  _NODE_TO_JSON_FUNC(SubscriptExpr, obj, op)
 };
 
 void PrintJson(const std::string &str, int depth = 0) {
@@ -293,7 +258,7 @@ int main(int argc, char *argv[]) {
     if (yyparse() != 0) return -1;
 
     auto to_json = ToJson();
-    PrintJson(to_json(kModule.get()));
+    PrintJson(to_json(*kModule));
     std::cout << std::endl << std::endl;
   }
 

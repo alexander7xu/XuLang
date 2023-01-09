@@ -2,6 +2,45 @@
 
 namespace ast {
 
+void VisitorInterface::Visit(class OpPlus *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpMinus *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpMul *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpDiv *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpMod *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpBitXor *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpBitOr *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpBitAnd *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpShiftL *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpShiftR *) { throw "Unimplemented"; }
+
+void VisitorInterface::Visit(class OpAssign *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpSelfPlus *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpSelfMinus *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpSelfMul *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpSelfDiv *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpSelfMod *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpSelfBitXor *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpSelfBitOr *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpSelfBitAnd *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpSelfShiftL *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpSelfShiftR *) { throw "Unimplemented"; }
+
+void VisitorInterface::Visit(class OpOr *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpAnd *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpEq *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpNe *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpLe *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpGe *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpLt *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpGt *) { throw "Unimplemented"; }
+
+void VisitorInterface::Visit(class OpBitNot *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpNot *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpPositive *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpNegative *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpDeref *) { throw "Unimplemented"; }
+void VisitorInterface::Visit(class OpRef *) { throw "Unimplemented"; }
+
 #define _OVERRIDE_LEAF_ACCEPT(LeafClass) \
   void LeafClass::Accept(VisitorInterface *visitor) { visitor->Visit(this); }
 

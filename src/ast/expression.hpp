@@ -1,7 +1,6 @@
 #ifndef _XULANG_SRC_AST_EXPRESSION_HPP
 #define _XULANG_SRC_AST_EXPRESSION_HPP
 
-#include "../builtin/type.hpp"
 #include "./operator.hpp"
 
 namespace ast {
@@ -11,9 +10,9 @@ class Expression : public Node {};
 class Literal final : public Expression {
  public:
   Uptr<TextType> val;
-  const builtin::BasicType &type;
-  Literal(Uptr<TextType> &&val, const builtin::BasicType &basic_type)
-      : val(std::move(val)), type(basic_type) {}
+  enum Type { kInt, kFloat, kString } type;
+  inline static const char *const kTypeNames[] = {"Int", "Float", "String"};
+  Literal(Uptr<TextType> &&val, Type type) : val(std::move(val)), type(type) {}
   virtual void Accept(VisitorInterface *) override;
 };
 
@@ -51,10 +50,10 @@ class BinaryOpExpr final : public Expression {
 
 class AssignOpExpr final : public Expression {
  public:
-  Uptr<Expression> target;
+  Uptr<Name> target;
   Uptr<AssignOperator> op;
   Uptr<Expression> expr;
-  AssignOpExpr(Uptr<Expression> &&target, Uptr<AssignOperator> &&op,
+  AssignOpExpr(Uptr<Name> &&target, Uptr<AssignOperator> &&op,
                Uptr<Expression> &&expr)
       : target(std::move(target)), op(std::move(op)), expr(std::move(expr)) {}
   virtual void Accept(VisitorInterface *) override;

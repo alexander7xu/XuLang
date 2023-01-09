@@ -20,11 +20,12 @@ class UnaryOperator : public Operator {};
 class BinaryOperator : public Operator {};
 class AssignOperator : public Operator {};
 class LogicOperator : public Operator {};
+class VargOperator : public Operator {};
 
 // e.g.
 // x := Function(unameds0, u:type_args0, v:type_args1, x:=keywords0) {}
 // x(unameds0, v:=keywords0)
-class CallOperator final : public Operator {
+class CallOperator final : public VargOperator {
  public:
   std::list<Uptr<Expression>> unameds;
   std::list<std::tuple<Uptr<TextType>, Uptr<Name>>> type_args;
@@ -37,7 +38,7 @@ class CallOperator final : public Operator {
   inline void AddUnamed(Uptr<Expression> &&unamed) {
     unameds.push_back(std::move(unamed));
   }
-  void AddTypeArg(Uptr<TextType> &&id, Uptr<Name> &&type) {
+  inline void AddTypeArg(Uptr<TextType> &&id, Uptr<Name> &&type) {
     type_args.push_back({std::move(id), std::move(type)});
   }
   inline void AddKeyword(Uptr<TextType> &&name, Uptr<Expression> &&val) {
@@ -45,7 +46,7 @@ class CallOperator final : public Operator {
   }
 };
 
-class SubscriptOperator final : public Operator {
+class SubscriptOperator final : public VargOperator {
  public:
   // e.g. [beg:end:step], [beg:end], [beg], [:end], [::step], [beg::step]
   using SubscriptArg =

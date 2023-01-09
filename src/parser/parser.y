@@ -55,6 +55,7 @@
     ast::CallOperator       *CallOperatorP;
     ast::SubscriptOperator  *SubscriptOperatorP;
     ast::SubscriptOperator::SubscriptArg *SubscriptArgP;
+    ast::LogicExpr          *LogicExprP;
 }
 
 
@@ -74,15 +75,15 @@
 
 %type <StatementP>  stmt
 %type <StatementP>  break continue return raise
-%type <StatementP>  if while try
+%type <StatementP>  if while try _end_if
 %type <ExpressionP> expr
-%type <ExpressionP> literal uop_expr bop_expr aop_expr logic_expr
+%type <ExpressionP> literal uop_expr bop_expr aop_expr
+%type <LogicExprP>  logic_expr
 %type <ExpressionP> subscript if_else
 %type <CreateP>     create obj_create function assemble struct class import
 
 %type <ModuleP>             module
 %type <BlockP>              block _stmts
-%type <IfP>                 _beg_if
 %type <TryP>                _beg_try
 %type <NameP>               name
 %type <CallExprP>           call
@@ -148,16 +149,17 @@ return      : TK_RETURN expr { $$ = new ast::Return(MVU($2)); }
             ;
 raise       : TK_RAISE expr { $$ = new ast::Raise(MVU($2)); }
             ;
-if          : _beg_if TK_ELSE block { $$ = $1; $1->SetOrelse(MVU($3)); }
-            | _beg_if { $$ = $1; }
+if          : TK_IF TK_PAREN_L logic_expr TK_PAREN_R block _end_if
+                { $$ = new ast::If(MVU($3), MVU($5), MVU($6)); }
             ;
-_beg_if     : TK_IF TK_PAREN_L expr TK_PAREN_R block { $$ = new ast::If(MVU($3), MVU($5)); }
-            | _beg_if TK_ELSE TK_IF TK_PAREN_L expr TK_PAREN_R block
-                { $$ = $1; $1->SetOrelse(UNEW(ast::Block( UNEW(ast::If(MVU($5), MVU($7))) ))); }
+_end_if     : TK_ELSE block { $$ = $2; }
+            | TK_ELSE TK_IF TK_PAREN_L logic_expr TK_PAREN_R block _end_if
+                { $$ = new ast::If(MVU($4), MVU($6), MVU($7)); }
+            | %empty { $$ = nullptr; }
             ;
-while       : TK_WHILE TK_PAREN_L expr TK_PAREN_R block TK_ELSE block
+while       : TK_WHILE TK_PAREN_L logic_expr TK_PAREN_R block TK_ELSE block
                 { $$ = new ast::While(MVU($3), MVU($5), MVU($7)); }
-            | TK_WHILE TK_PAREN_L expr TK_PAREN_R block
+            | TK_WHILE TK_PAREN_L logic_expr TK_PAREN_R block
                 { $$ = new ast::While(MVU($3), MVU($5)); }
             ;
 function    : TK_IDENTIFIER TK_CREATE TK_FUNC op_call block
@@ -178,9 +180,9 @@ import      : TK_IDENTIFIER TK_CREATE TK_IMPORT TK_PAREN_L _unamed_args TK_PAREN
 try         : _beg_try TK_ELSE block { $$ = $1; $1->SetOrelse(MVU($3)); }
             | _beg_try { $$ = $1; }
             ;
-_beg_try    : TK_TRY block TK_EXCEPT TK_PAREN_L TK_IDENTIFIER TK_CREATE name TK_PAREN_R block
+_beg_try    : TK_TRY block TK_EXCEPT TK_PAREN_L TK_IDENTIFIER TK_COMMA name TK_PAREN_R block
                 { $$ = new ast::Try(MVU($2)); $$->AddExcept({MVU($5), MVU($7), MVU($9)}); }
-            | _beg_try TK_EXCEPT TK_PAREN_L TK_IDENTIFIER TK_CREATE name TK_PAREN_R block
+            | _beg_try TK_EXCEPT TK_PAREN_L TK_IDENTIFIER TK_COMMA name TK_PAREN_R block
                 { $$->AddExcept({MVU($4), MVU($6), MVU($8)}); }
             ;
 
@@ -189,7 +191,7 @@ expr        : literal
             | uop_expr
             | bop_expr
             | aop_expr
-            | logic_expr
+            | logic_expr { $$ = $1; }
             | call { $$ = $1; }
             | subscript
             | if_else
@@ -201,9 +203,9 @@ name        : expr TK_MEMBER TK_IDENTIFIER
                 { $$ = new ast::Name(MVU($3), true, MVU($1)); }
             | TK_IDENTIFIER { $$ = new ast::Name(MVU($1)); }
             ;
-literal     : TK_INTEGER { $$ = new ast::Literal(MVU($1), builtin::kInt); }
-            | TK_FLOAT { $$ = new ast::Literal(MVU($1), builtin::kFloat); }
-            | TK_STRING { $$ = new ast::Literal(MVU($1), builtin::kString); }
+literal     : TK_INTEGER { $$ = new ast::Literal(MVU($1), ast::Literal::Type::kInt); }
+            | TK_FLOAT { $$ = new ast::Literal(MVU($1), ast::Literal::Type::kFloat); }
+            | TK_STRING { $$ = new ast::Literal(MVU($1), ast::Literal::Type::kString); }
             ;
 call        : expr op_call { $$ = new ast::CallExpr(MVU($1), MVU($2)); }
             ;
@@ -213,18 +215,22 @@ if_else     : expr TK_IF expr TK_ELSE expr
                 { $$ = new ast::IfElseExpr(MVU($1), MVU($3), MVU($5)); }
             ;
 
-op_call     : TK_PAREN_L _named_args TK_PAREN_R { $$ = $2; }
+op_call     : TK_PAREN_L _unamed_args TK_PAREN_R { $$ = $2; }
             ;
-_named_args : _named_args TK_COMMA TK_IDENTIFIER TK_CREATE expr
-                { $1->AddKeyword(MVU($3), MVU($5)); }
+_unamed_args: expr TK_COMMA _unamed_args { $$ = $3; $$->AddUnamed(MVU($1)); }
+            | expr { $$ = new ast::CallOperator(); $$->AddUnamed(MVU($1)); }
             | _type_args { $$ = $1; }
             ;
-_type_args  : _type_args TK_COMMA TK_IDENTIFIER TK_COLON name
-                { $1->AddTypeArg(MVU($3), MVU($5)); }
-            | _unamed_args { $$ = $1; }
+_type_args  : TK_IDENTIFIER TK_COLON name TK_COMMA _type_args
+                { $$ = $5; $$->AddTypeArg(MVU($1), MVU($3)); }
+            | TK_IDENTIFIER TK_COLON name
+                { $$ = new ast::CallOperator(); $$->AddTypeArg(MVU($1), MVU($3)); }
+            | _named_args { $$ = $1; }
             ;
-_unamed_args: _unamed_args TK_COMMA expr { $1->AddUnamed(MVU($3)); }
-            | expr { $$ = new ast::CallOperator(); $$->AddUnamed(MVU($1)); }
+_named_args : TK_IDENTIFIER TK_CREATE expr TK_COMMA _named_args
+                { $$ = $5; $$->AddKeyword(MVU($1), MVU($3)); }
+            | TK_IDENTIFIER TK_CREATE expr
+                { $$ = new ast::CallOperator(); $$->AddKeyword(MVU($1), MVU($3)); }
             | %empty { $$ = new ast::CallOperator(); }
             ;
 
@@ -275,17 +281,17 @@ bop_expr    : expr TK_PLUS expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::
             | expr TK_SHIFT_L expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpShiftL()), MVU($3)); }
             | expr TK_SHIFT_R expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpShiftR()), MVU($3)); }
 
-aop_expr    : expr TK_ASSIGN expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpAssign()), MVU($3)); }
-            | expr TK_SELF_PLUS expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfPlus()), MVU($3)); }
-            | expr TK_SELF_MINUS expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfMinus()), MVU($3)); }
-            | expr TK_SELF_MUL expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfMul()), MVU($3)); }
-            | expr TK_SELF_DIV expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfMod()), MVU($3)); }
-            | expr TK_SELF_MOD expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfDiv()), MVU($3)); }
-            | expr TK_SELF_BXOR expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfBitXor()), MVU($3)); }
-            | expr TK_SELF_BOR expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfBitOr()), MVU($3)); }
-            | expr TK_SELF_BAND expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfBitAnd()), MVU($3)); }
-            | expr TK_SELF_SHIFT_L expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfShiftL()), MVU($3)); }
-            | expr TK_SELF_SHIFT_R expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfShiftR()), MVU($3)); }
+aop_expr    : name TK_ASSIGN expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpAssign()), MVU($3)); }
+            | name TK_SELF_PLUS expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfPlus()), MVU($3)); }
+            | name TK_SELF_MINUS expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfMinus()), MVU($3)); }
+            | name TK_SELF_MUL expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfMul()), MVU($3)); }
+            | name TK_SELF_DIV expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfMod()), MVU($3)); }
+            | name TK_SELF_MOD expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfDiv()), MVU($3)); }
+            | name TK_SELF_BXOR expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfBitXor()), MVU($3)); }
+            | name TK_SELF_BOR expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfBitOr()), MVU($3)); }
+            | name TK_SELF_BAND expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfBitAnd()), MVU($3)); }
+            | name TK_SELF_SHIFT_L expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfShiftL()), MVU($3)); }
+            | name TK_SELF_SHIFT_R expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfShiftR()), MVU($3)); }
             ;
 
 logic_expr  : expr TK_OR expr { $$ = new ast::LogicExpr(MVU($1), UNEW(ast::OpOr()), MVU($3)); }

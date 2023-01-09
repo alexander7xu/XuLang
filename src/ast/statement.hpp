@@ -63,26 +63,24 @@ class Return final : public Statement {
 // e.g. if (test) {  } else if (exp_b) { } else { }
 class If final : public Statement {
  public:
-  Uptr<Expression> test;
+  Uptr<LogicExpr> test;
   Uptr<Block> body;
-  Uptr<Block> orelse;
-  If(Uptr<Expression> &&test, Uptr<Block> &&body,
-     Uptr<Block> &&orelse = nullptr)
+  Uptr<Statement> orelse;
+  If(Uptr<LogicExpr> &&test, Uptr<Block> &&body,
+     Uptr<Statement> &&orelse = nullptr)
       : test(std::move(test)),
         body(std::move(body)),
         orelse(std::move(orelse)) {}
   virtual void Accept(VisitorInterface *) override;
-
-  inline void SetOrelse(Uptr<Block> &&block) { orelse = std::move(block); }
 };
 
 // e.g. while (test) {  } else { }
 class While final : public Statement {
  public:
-  Uptr<Expression> test;
+  Uptr<LogicExpr> test;
   Uptr<Block> body;
   Uptr<Block> orelse;
-  While(Uptr<Expression> &&test, Uptr<Block> &&body,
+  While(Uptr<LogicExpr> &&test, Uptr<Block> &&body,
         Uptr<Block> &&orelse = nullptr)
       : test(std::move(test)),
         body(std::move(body)),

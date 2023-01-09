@@ -1,0 +1,21 @@
+SrcLoc := Struct() {    # SrcLoc 结构体
+    line := 0           # 变量line，Int型，默认值为0
+    col := 0            # 变量col，Int型，默认值为0
+}
+
+Ast := Class() {        # Ast 类
+    loc := SrcLoc()     # 属性loc，SrcLoc型
+}
+
+Expression := Class(Ast) {  # Expression类，继承Ast类
+    # Expression类的构造函数；返回类型必须为Ast；第一个参数必须为Expression类型，表示对象自身
+    __create__ := Function(Expression, self:Expression, line:Int, col:=0) {
+        self.loc.line = line    # self的属性loc的变量line赋值为参数line
+        self.loc.col = col      # self的属性loc的变量col赋值为参数col
+        return self             # 返回self
+    }
+}
+
+ast := Import('./ast') {
+    'ast.xl'
+}

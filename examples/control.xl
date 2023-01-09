@@ -1,0 +1,21 @@
+main := Function(Void) {
+    x := 4                          # 创建变量x，Int型，值为4
+    y := 2                          # 创建变量y，Int型，值为2
+
+    while (x > 0) {                 # 当x>0时进入循环
+        z := x + y                  # 创建变量z，Int型，值为x+y
+        if (z == 0 || z == 42) {    # 当 z == 0 或 z == 42时
+            break                   # 跳出循环
+        } else if (z < 0) {         # 否则当 z < 0时
+            y += 2                  # y自增2
+        } else {                    # 否则
+            x -= 2                  # x自减2
+            continue                # 回到循环头
+        }
+        x -= 1                      # x自减1
+    } else {                        # 循环不是通过break结束的，进入此else
+        return z                    # 返回z
+    }
+    # 离开了变量z的作用域
+    return 0
+}
