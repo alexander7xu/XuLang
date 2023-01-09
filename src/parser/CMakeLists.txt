@@ -10,4 +10,8 @@ add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/tokens.cpp
     COMMAND flex -o ${CMAKE_CURRENT_BINARY_DIR}/tokens.cpp ${CMAKE_CURRENT_SOURCE_DIR}/token.l
 )
-add_library(parser SHARED ${PROJECT_BINARY_DIR}/tokens.cpp ${PROJECT_BINARY_DIR}/parser.cpp)
+add_library(parser SHARED
+            ${PROJECT_BINARY_DIR}/tokens.cpp
+            ${PROJECT_BINARY_DIR}/parser.cpp
+            ./parser.cc
+            )

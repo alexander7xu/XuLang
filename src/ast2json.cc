@@ -1,13 +1,4 @@
-#include <iostream>
-#include <stack>
-
-#include "./ast/statement.hpp"
-#include "./utils/log.hpp"
-
-extern int yyparse();
-extern FILE *yyin;
-extern std::stack<std::string> kFilenames;
-extern utils::Uptr<ast::Module> kModule;
+#include "./parser/parser.hpp"
 
 using namespace ast;
 
@@ -252,13 +243,12 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  for (int i = 1; i < argc; ++i) {
-    kFilenames.push(argv[i]);
-    yyin = fopen(argv[i], "r+");
-    if (yyparse() != 0) return -1;
+  auto parser = parser::Parser();
+  auto to_json = ToJson();
 
-    auto to_json = ToJson();
-    PrintJson(to_json(*kModule));
+  for (int i = 1; i < argc; ++i) {
+    if (parser.Parse(argv[i]) == false) return -1;
+    PrintJson(to_json(*parser.GetAst()));
     std::cout << std::endl << std::endl;
   }
 

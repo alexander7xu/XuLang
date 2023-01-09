@@ -67,9 +67,10 @@ class Logger final {
   inline static constexpr int kLevelError = 40;
   inline static constexpr int kLevelCritical = 50;
 
-  static std::shared_ptr<Logger> GetLogger(const std::string &name);
-  static std::shared_ptr<Logger> NewLogger(const std::string &name,
-                                           int level = kLevelDefault);
+  static std::shared_ptr<Logger> Get(const std::string &name,
+                                     bool auto_new = false);
+  static std::shared_ptr<Logger> New(const std::string &name,
+                                     int level = kLevelDefault);
 
  private:
   static std::unordered_map<std::string, std::shared_ptr<Logger>> kLoggerMap;

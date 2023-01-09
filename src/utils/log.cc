@@ -4,16 +4,17 @@ namespace utils {
 
 std::unordered_map<std::string, std::shared_ptr<Logger>> Logger::kLoggerMap;
 
-std::shared_ptr<Logger> Logger::NewLogger(const std::string &name, int level) {
+utils::Sptr<Logger> Logger::New(const std::string &name, int level) {
   if (kLoggerMap.find(name) != kLoggerMap.end()) return nullptr;
   auto res = kLoggerMap[name] =
       std::shared_ptr<Logger>(new Logger(name, kLevelDefault));
   return res;
 }
 
-std::shared_ptr<Logger> Logger::GetLogger(const std::string &name) {
+utils::Sptr<Logger> Logger::Get(const std::string &name, bool auto_new) {
   auto it = kLoggerMap.find(name);
-  return it != kLoggerMap.end() ? it->second : nullptr;
+  if (it != kLoggerMap.end()) return it->second;
+  return auto_new ? New(name) : nullptr;
 }
 
 }  // namespace utils

@@ -2,38 +2,29 @@
 // tokens.l lex file. We also define the node type they represent.
 
 %code requires {
-    #include "ast/statement.hpp"
+    #include "parser/parser.hpp"
 
-    #define MVU(p)      (std::unique_ptr<std::remove_reference<decltype(*p)>::type>(p))
+    #define B2U(p)      (utils::Uptr<std::remove_reference<decltype(*p)>::type>(p))
     #define UNEW(exp)   (utils::Uptr<decltype(exp)>(new exp))
 
     #define YYLTYPE_IS_DECLARED
-    #define YYLTYPE ast::SourceCodeLocator
+    #define YYLTYPE parser::SourceCodeLocator
 
-    #define YYLLOC_DEFAULT(cur, x, n)                                  \
-        if (n > 0) {                                                   \
-            (cur).line_beg = YYRHSLOC(x, 1).line_beg;                  \
-            (cur).col_beg = YYRHSLOC(x, 1).col_beg;                    \
-            (cur).line_end = YYRHSLOC(x, n).line_end;                  \
-            (cur).col_end = YYRHSLOC(x, n).col_end;                    \
-            (cur).file_idx = kFilenames.size() - 1;                    \
-        } else {                                                       \
-            (cur).line_beg = (cur).line_end = YYRHSLOC(x, 0).line_end; \
-            (cur).col_beg = (cur).col_end = YYRHSLOC(x, 0).col_end;    \
-            (cur).file_idx = kFilenames.size() - 1;                    \
-        }
-
+    #define YYLLOC_DEFAULT(cur, x, n)               \
+            (cur).line = YYRHSLOC(x, 0).line;       \
+            (cur).col = YYRHSLOC(x, 0).col;         \
+            (cur).file_idx = kFilenames.size() - 1;
 }
 
 %{
-    #include "../src/ast/statement.hpp"
-    #include <stack>
+    #include "parser/parser.hpp"
+    #include <vector>
     
     int yylex();
     void yyerror(char const *s);
 
-    std::stack<std::string> kFilenames;
-    utils::Uptr<ast::Module> kModule = nullptr; // the top level root node of our final AST
+    extern std::vector<std::string> kFilenames;
+    extern utils::Sptr<ast::Module> kModule; // the top level root node of our final AST
 %}
 
 
@@ -111,20 +102,33 @@
 %locations
 
 %%
-start   : module { kModule = MVU($1); }
+_lf         : TK_LF | %empty
+            ;
+_comma      : TK_COMMA _lf
+            ;
+_paren_l    : TK_PAREN_L _lf
+            ;
+_paren_r    : TK_PAREN_R
+            ;
+_bracket_l  : TK_BRACKET_L _lf
+            ;
+_bracket_r  : TK_BRACKET_R
+            ;
+
+start   : module { kModule = B2U($1); }
         ;
-module  : module TK_LF create { $1->AddObj(MVU($3)); }
+module  : module TK_LF create { $1->AddObj(B2U($3)); }
         | module TK_LF { $$ = $1; }
-        | create { $$ = new ast::Module(kFilenames.top(), MVU($1)); }
-        | %empty { $$ = new ast::Module(kFilenames.top()); }
+        | create { $$ = new ast::Module(kFilenames.front(), B2U($1)); }
+        | %empty { $$ = new ast::Module(kFilenames.front()); }
         ;
 create  : obj_create | function | assemble | struct | class | import
         ;
 block   : TK_BRACE_L _stmts TK_BRACE_R { $$ = $2; }
         ;
-_stmts  : _stmts TK_LF stmt { $1->AddStatement(MVU($3)); }
+_stmts  : _stmts TK_LF stmt { $1->AddStatement(B2U($3)); }
         | _stmts TK_LF { $$ = $1; }
-        | stmt { $$ = new ast::Block(MVU($1));}
+        | stmt { $$ = new ast::Block(B2U($1));}
         | %empty { $$ = new ast::Block(); }
         ;
 
@@ -136,54 +140,54 @@ stmt        : create { $$ = $1; }
             | if
             | while
             | try
-            | expr { $$ = new ast::ExprStatement(MVU($1)); }
+            | expr { $$ = new ast::ExprStatement(B2U($1)); }
             ;
-obj_create  : TK_IDENTIFIER TK_CREATE expr { $$ = new ast::ObjCreate(MVU($1), MVU($3)); }
+obj_create  : TK_IDENTIFIER TK_CREATE expr { $$ = new ast::ObjCreate(B2U($1), B2U($3)); }
             ;
 break       : TK_BREAK { $$ = new ast::Break(); }
             ;
 continue    : TK_CONTINUE { $$ = new ast::Continue(); }
             ;
-return      : TK_RETURN expr { $$ = new ast::Return(MVU($2)); }
+return      : TK_RETURN expr { $$ = new ast::Return(B2U($2)); }
             | TK_RETURN { $$ = new ast::Return(nullptr); }
             ;
-raise       : TK_RAISE expr { $$ = new ast::Raise(MVU($2)); }
+raise       : TK_RAISE expr { $$ = new ast::Raise(B2U($2)); }
             ;
-if          : TK_IF TK_PAREN_L logic_expr TK_PAREN_R block _end_if
-                { $$ = new ast::If(MVU($3), MVU($5), MVU($6)); }
+if          : TK_IF _paren_l logic_expr _paren_r block _end_if
+                { $$ = new ast::If(B2U($3), B2U($5), B2U($6)); }
             ;
 _end_if     : TK_ELSE block { $$ = $2; }
-            | TK_ELSE TK_IF TK_PAREN_L logic_expr TK_PAREN_R block _end_if
-                { $$ = new ast::If(MVU($4), MVU($6), MVU($7)); }
+            | TK_ELSE TK_IF _paren_l logic_expr _paren_r block _end_if
+                { $$ = new ast::If(B2U($4), B2U($6), B2U($7)); }
             | %empty { $$ = nullptr; }
             ;
-while       : TK_WHILE TK_PAREN_L logic_expr TK_PAREN_R block TK_ELSE block
-                { $$ = new ast::While(MVU($3), MVU($5), MVU($7)); }
-            | TK_WHILE TK_PAREN_L logic_expr TK_PAREN_R block
-                { $$ = new ast::While(MVU($3), MVU($5)); }
+while       : TK_WHILE _paren_l logic_expr _paren_r block TK_ELSE block
+                { $$ = new ast::While(B2U($3), B2U($5), B2U($7)); }
+            | TK_WHILE _paren_l logic_expr _paren_r block
+                { $$ = new ast::While(B2U($3), B2U($5)); }
             ;
 function    : TK_IDENTIFIER TK_CREATE TK_FUNC op_call block
-                { $$ = new ast::Function(MVU($1), MVU($4), MVU($5)); }
+                { $$ = new ast::Function(B2U($1), B2U($4), B2U($5)); }
             ;
 assemble    : TK_IDENTIFIER TK_CREATE TK_ASM op_call block
-                { $$ = new ast::Assemble(MVU($1), MVU($4), MVU($5)); }
+                { $$ = new ast::Assemble(B2U($1), B2U($4), B2U($5)); }
             ;
-struct      : TK_IDENTIFIER TK_CREATE TK_STRUCT TK_PAREN_L TK_PAREN_R block
-                { $$ = new ast::Struct(MVU($1), MVU($6)); }
+struct      : TK_IDENTIFIER TK_CREATE TK_STRUCT _paren_l _paren_r block
+                { $$ = new ast::Struct(B2U($1), B2U($6)); }
             ;
-class       : TK_IDENTIFIER TK_CREATE TK_CLASS TK_PAREN_L _unamed_args TK_PAREN_R block
-                { $$ = new ast::Class(MVU($1), MVU($5), MVU($7)); }
+class       : TK_IDENTIFIER TK_CREATE TK_CLASS _paren_l _unamed_args _paren_r block
+                { $$ = new ast::Class(B2U($1), B2U($5), B2U($7)); }
             ;
-import      : TK_IDENTIFIER TK_CREATE TK_IMPORT TK_PAREN_L _unamed_args TK_PAREN_R block
-                { $$ = new ast::Import(MVU($1), MVU($5), MVU($7)); }
+import      : TK_IDENTIFIER TK_CREATE TK_IMPORT _paren_l _unamed_args _paren_r block
+                { $$ = new ast::Import(B2U($1), B2U($5), B2U($7)); }
             ;
-try         : _beg_try TK_ELSE block { $$ = $1; $1->SetOrelse(MVU($3)); }
+try         : _beg_try TK_ELSE block { $$ = $1; $1->SetOrelse(B2U($3)); }
             | _beg_try { $$ = $1; }
             ;
-_beg_try    : TK_TRY block TK_EXCEPT TK_PAREN_L TK_IDENTIFIER TK_COMMA name TK_PAREN_R block
-                { $$ = new ast::Try(MVU($2)); $$->AddExcept({MVU($5), MVU($7), MVU($9)}); }
-            | _beg_try TK_EXCEPT TK_PAREN_L TK_IDENTIFIER TK_COMMA name TK_PAREN_R block
-                { $$->AddExcept({MVU($4), MVU($6), MVU($8)}); }
+_beg_try    : TK_TRY block TK_EXCEPT _paren_l TK_IDENTIFIER _comma name _paren_r block
+                { $$ = new ast::Try(B2U($2)); $$->AddExcept({B2U($5), B2U($7), B2U($9)}); }
+            | _beg_try TK_EXCEPT _paren_l TK_IDENTIFIER _comma name _paren_r block
+                { $$->AddExcept({B2U($4), B2U($6), B2U($8)}); }
             ;
 
 expr        : literal
@@ -195,64 +199,64 @@ expr        : literal
             | call { $$ = $1; }
             | subscript
             | if_else
-            | TK_PAREN_L expr TK_PAREN_R { $$ = $2; }
+            | _paren_l expr _paren_r { $$ = $2; }
             ;
 name        : expr TK_MEMBER TK_IDENTIFIER
-                { $$ = new ast::Name(MVU($3), false, MVU($1)); }
+                { $$ = new ast::Name(B2U($3), false, B2U($1)); }
             | expr TK_DEREF_MEMBER TK_IDENTIFIER
-                { $$ = new ast::Name(MVU($3), true, MVU($1)); }
-            | TK_IDENTIFIER { $$ = new ast::Name(MVU($1)); }
+                { $$ = new ast::Name(B2U($3), true, B2U($1)); }
+            | TK_IDENTIFIER { $$ = new ast::Name(B2U($1)); }
             ;
-literal     : TK_INTEGER { $$ = new ast::Literal(MVU($1), ast::Literal::Type::kInt); }
-            | TK_FLOAT { $$ = new ast::Literal(MVU($1), ast::Literal::Type::kFloat); }
-            | TK_STRING { $$ = new ast::Literal(MVU($1), ast::Literal::Type::kString); }
+literal     : TK_INTEGER { $$ = new ast::Literal(B2U($1), ast::Literal::Type::kInt); }
+            | TK_FLOAT { $$ = new ast::Literal(B2U($1), ast::Literal::Type::kFloat); }
+            | TK_STRING { $$ = new ast::Literal(B2U($1), ast::Literal::Type::kString); }
             ;
-call        : expr op_call { $$ = new ast::CallExpr(MVU($1), MVU($2)); }
+call        : expr op_call { $$ = new ast::CallExpr(B2U($1), B2U($2)); }
             ;
-subscript   : expr op_subscript { $$ = new ast::SubscriptExpr(MVU($1), MVU($2)); }
+subscript   : expr op_subscript { $$ = new ast::SubscriptExpr(B2U($1), B2U($2)); }
             ;
 if_else     : expr TK_IF expr TK_ELSE expr
-                { $$ = new ast::IfElseExpr(MVU($1), MVU($3), MVU($5)); }
+                { $$ = new ast::IfElseExpr(B2U($1), B2U($3), B2U($5)); }
             ;
 
-op_call     : TK_PAREN_L _unamed_args TK_PAREN_R { $$ = $2; }
+op_call     : _paren_l _unamed_args _paren_r { $$ = $2; }
             ;
-_unamed_args: expr TK_COMMA _unamed_args { $$ = $3; $$->AddUnamed(MVU($1)); }
-            | expr { $$ = new ast::CallOperator(); $$->AddUnamed(MVU($1)); }
+_unamed_args: expr _comma _unamed_args { $$ = $3; $$->AddUnamed(B2U($1)); }
+            | expr { $$ = new ast::CallOperator(); $$->AddUnamed(B2U($1)); }
             | _type_args { $$ = $1; }
             ;
-_type_args  : TK_IDENTIFIER TK_COLON name TK_COMMA _type_args
-                { $$ = $5; $$->AddTypeArg(MVU($1), MVU($3)); }
+_type_args  : TK_IDENTIFIER TK_COLON name _comma _type_args
+                { $$ = $5; $$->AddTypeArg(B2U($1), B2U($3)); }
             | TK_IDENTIFIER TK_COLON name
-                { $$ = new ast::CallOperator(); $$->AddTypeArg(MVU($1), MVU($3)); }
+                { $$ = new ast::CallOperator(); $$->AddTypeArg(B2U($1), B2U($3)); }
             | _named_args { $$ = $1; }
             ;
-_named_args : TK_IDENTIFIER TK_CREATE expr TK_COMMA _named_args
-                { $$ = $5; $$->AddKeyword(MVU($1), MVU($3)); }
+_named_args : TK_IDENTIFIER TK_CREATE expr _comma _named_args
+                { $$ = $5; $$->AddKeyword(B2U($1), B2U($3)); }
             | TK_IDENTIFIER TK_CREATE expr
-                { $$ = new ast::CallOperator(); $$->AddKeyword(MVU($1), MVU($3)); }
+                { $$ = new ast::CallOperator(); $$->AddKeyword(B2U($1), B2U($3)); }
             | %empty { $$ = new ast::CallOperator(); }
             ;
 
-op_subscript    : TK_BRACKET_L _subscript_list TK_BRACKET_R { $$ = $2; }
+op_subscript    : _bracket_l _subscript_list _bracket_r { $$ = $2; }
                 ;
-_subscript_list : _subscript_list TK_COMMA _subscript_arg { $1->AddDim(MVU($3)); }
-                | _subscript_arg { $$ = new ast::SubscriptOperator(); $$->AddDim(MVU($1)); }
+_subscript_list : _subscript_list _comma _subscript_arg { $1->AddDim(B2U($3)); }
+                | _subscript_arg { $$ = new ast::SubscriptOperator(); $$->AddDim(B2U($1)); }
                 ;
 _subscript_arg  : expr TK_COLON expr TK_COLON expr
-                    { $$ = new ast::SubscriptOperator::SubscriptArg({MVU($1), MVU($3), MVU($5)}); }
+                    { $$ = new ast::SubscriptOperator::SubscriptArg({B2U($1), B2U($3), B2U($5)}); }
                 | TK_COLON expr TK_COLON expr
-                    { $$ = new ast::SubscriptOperator::SubscriptArg({nullptr, MVU($2), MVU($4)}); }
+                    { $$ = new ast::SubscriptOperator::SubscriptArg({nullptr, B2U($2), B2U($4)}); }
                 | expr TK_COLON TK_COLON expr
-                    { $$ = new ast::SubscriptOperator::SubscriptArg({MVU($1), nullptr, MVU($4)}); }
+                    { $$ = new ast::SubscriptOperator::SubscriptArg({B2U($1), nullptr, B2U($4)}); }
                 | expr TK_COLON expr _colon
-                    { $$ = new ast::SubscriptOperator::SubscriptArg({MVU($1), MVU($3), nullptr}); }
+                    { $$ = new ast::SubscriptOperator::SubscriptArg({B2U($1), B2U($3), nullptr}); }
                 | expr _colon_pair
-                    { $$ = new ast::SubscriptOperator::SubscriptArg({MVU($1), nullptr, nullptr}); }
+                    { $$ = new ast::SubscriptOperator::SubscriptArg({B2U($1), nullptr, nullptr}); }
                 | TK_COLON expr _colon
-                    { $$ = new ast::SubscriptOperator::SubscriptArg({nullptr, MVU($2), nullptr}); }
+                    { $$ = new ast::SubscriptOperator::SubscriptArg({nullptr, B2U($2), nullptr}); }
                 | TK_COLON TK_COLON expr
-                    { $$ = new ast::SubscriptOperator::SubscriptArg({nullptr, nullptr, MVU($3)}); }
+                    { $$ = new ast::SubscriptOperator::SubscriptArg({nullptr, nullptr, B2U($3)}); }
                 ;
 _colon_pair     : TK_COLON TK_COLON
                 | TK_COLON
@@ -262,45 +266,45 @@ _colon          : TK_COLON
                 | %empty
                 ;
 
-uop_expr    : TK_BNOT expr %prec PR_UOP { $$ = new ast::UnaryOpExpr(UNEW(ast::OpBitNot()), MVU($2)); }
-            | TK_NOT expr %prec PR_UOP { $$ = new ast::UnaryOpExpr(UNEW(ast::OpNot()), MVU($2)); }
-            | TK_PLUS expr %prec PR_UOP { $$ = new ast::UnaryOpExpr(UNEW(ast::OpPositive()), MVU($2)); }
-            | TK_MINUS expr %prec PR_UOP { $$ = new ast::UnaryOpExpr(UNEW(ast::OpNegative()), MVU($2)); }
-            | TK_MUL expr %prec PR_UOP { $$ = new ast::UnaryOpExpr(UNEW(ast::OpDeref()), MVU($2)); }
-            | TK_BAND expr %prec PR_UOP { $$ = new ast::UnaryOpExpr(UNEW(ast::OpRef()), MVU($2)); }
+uop_expr    : TK_BNOT expr %prec PR_UOP { $$ = new ast::UnaryOpExpr(UNEW(ast::OpBitNot()), B2U($2)); }
+            | TK_NOT expr %prec PR_UOP { $$ = new ast::UnaryOpExpr(UNEW(ast::OpNot()), B2U($2)); }
+            | TK_PLUS expr %prec PR_UOP { $$ = new ast::UnaryOpExpr(UNEW(ast::OpPositive()), B2U($2)); }
+            | TK_MINUS expr %prec PR_UOP { $$ = new ast::UnaryOpExpr(UNEW(ast::OpNegative()), B2U($2)); }
+            | TK_MUL expr %prec PR_UOP { $$ = new ast::UnaryOpExpr(UNEW(ast::OpDeref()), B2U($2)); }
+            | TK_BAND expr %prec PR_UOP { $$ = new ast::UnaryOpExpr(UNEW(ast::OpRef()), B2U($2)); }
             ;
 
-bop_expr    : expr TK_PLUS expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpPlus()), MVU($3)); }
-            | expr TK_MINUS expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpMinus()), MVU($3)); }
-            | expr TK_MUL expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpMul()), MVU($3)); }
-            | expr TK_DIV expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpMod()), MVU($3)); }
-            | expr TK_MOD expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpDiv()), MVU($3)); }
-            | expr TK_BXOR expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpBitXor()), MVU($3)); }
-            | expr TK_BOR expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpBitOr()), MVU($3)); }
-            | expr TK_BAND expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpBitAnd()), MVU($3)); }
-            | expr TK_SHIFT_L expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpShiftL()), MVU($3)); }
-            | expr TK_SHIFT_R expr { $$ = new ast::BinaryOpExpr(MVU($1), UNEW(ast::OpShiftR()), MVU($3)); }
+bop_expr    : expr TK_PLUS expr { $$ = new ast::BinaryOpExpr(B2U($1), UNEW(ast::OpPlus()), B2U($3)); }
+            | expr TK_MINUS expr { $$ = new ast::BinaryOpExpr(B2U($1), UNEW(ast::OpMinus()), B2U($3)); }
+            | expr TK_MUL expr { $$ = new ast::BinaryOpExpr(B2U($1), UNEW(ast::OpMul()), B2U($3)); }
+            | expr TK_DIV expr { $$ = new ast::BinaryOpExpr(B2U($1), UNEW(ast::OpMod()), B2U($3)); }
+            | expr TK_MOD expr { $$ = new ast::BinaryOpExpr(B2U($1), UNEW(ast::OpDiv()), B2U($3)); }
+            | expr TK_BXOR expr { $$ = new ast::BinaryOpExpr(B2U($1), UNEW(ast::OpBitXor()), B2U($3)); }
+            | expr TK_BOR expr { $$ = new ast::BinaryOpExpr(B2U($1), UNEW(ast::OpBitOr()), B2U($3)); }
+            | expr TK_BAND expr { $$ = new ast::BinaryOpExpr(B2U($1), UNEW(ast::OpBitAnd()), B2U($3)); }
+            | expr TK_SHIFT_L expr { $$ = new ast::BinaryOpExpr(B2U($1), UNEW(ast::OpShiftL()), B2U($3)); }
+            | expr TK_SHIFT_R expr { $$ = new ast::BinaryOpExpr(B2U($1), UNEW(ast::OpShiftR()), B2U($3)); }
 
-aop_expr    : name TK_ASSIGN expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpAssign()), MVU($3)); }
-            | name TK_SELF_PLUS expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfPlus()), MVU($3)); }
-            | name TK_SELF_MINUS expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfMinus()), MVU($3)); }
-            | name TK_SELF_MUL expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfMul()), MVU($3)); }
-            | name TK_SELF_DIV expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfMod()), MVU($3)); }
-            | name TK_SELF_MOD expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfDiv()), MVU($3)); }
-            | name TK_SELF_BXOR expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfBitXor()), MVU($3)); }
-            | name TK_SELF_BOR expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfBitOr()), MVU($3)); }
-            | name TK_SELF_BAND expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfBitAnd()), MVU($3)); }
-            | name TK_SELF_SHIFT_L expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfShiftL()), MVU($3)); }
-            | name TK_SELF_SHIFT_R expr { $$ = new ast::AssignOpExpr(MVU($1), UNEW(ast::OpSelfShiftR()), MVU($3)); }
+aop_expr    : name TK_ASSIGN expr { $$ = new ast::AssignOpExpr(B2U($1), UNEW(ast::OpAssign()), B2U($3)); }
+            | name TK_SELF_PLUS expr { $$ = new ast::AssignOpExpr(B2U($1), UNEW(ast::OpSelfPlus()), B2U($3)); }
+            | name TK_SELF_MINUS expr { $$ = new ast::AssignOpExpr(B2U($1), UNEW(ast::OpSelfMinus()), B2U($3)); }
+            | name TK_SELF_MUL expr { $$ = new ast::AssignOpExpr(B2U($1), UNEW(ast::OpSelfMul()), B2U($3)); }
+            | name TK_SELF_DIV expr { $$ = new ast::AssignOpExpr(B2U($1), UNEW(ast::OpSelfMod()), B2U($3)); }
+            | name TK_SELF_MOD expr { $$ = new ast::AssignOpExpr(B2U($1), UNEW(ast::OpSelfDiv()), B2U($3)); }
+            | name TK_SELF_BXOR expr { $$ = new ast::AssignOpExpr(B2U($1), UNEW(ast::OpSelfBitXor()), B2U($3)); }
+            | name TK_SELF_BOR expr { $$ = new ast::AssignOpExpr(B2U($1), UNEW(ast::OpSelfBitOr()), B2U($3)); }
+            | name TK_SELF_BAND expr { $$ = new ast::AssignOpExpr(B2U($1), UNEW(ast::OpSelfBitAnd()), B2U($3)); }
+            | name TK_SELF_SHIFT_L expr { $$ = new ast::AssignOpExpr(B2U($1), UNEW(ast::OpSelfShiftL()), B2U($3)); }
+            | name TK_SELF_SHIFT_R expr { $$ = new ast::AssignOpExpr(B2U($1), UNEW(ast::OpSelfShiftR()), B2U($3)); }
             ;
 
-logic_expr  : expr TK_OR expr { $$ = new ast::LogicExpr(MVU($1), UNEW(ast::OpOr()), MVU($3)); }
-            | expr TK_AND expr { $$ = new ast::LogicExpr(MVU($1), UNEW(ast::OpAnd()), MVU($3)); }
-            | expr TK_EQ expr { $$ = new ast::LogicExpr(MVU($1), UNEW(ast::OpEq()), MVU($3)); }
-            | expr TK_NE expr { $$ = new ast::LogicExpr(MVU($1), UNEW(ast::OpNe()), MVU($3)); }
-            | expr TK_LE expr { $$ = new ast::LogicExpr(MVU($1), UNEW(ast::OpLe()), MVU($3)); }
-            | expr TK_GE expr { $$ = new ast::LogicExpr(MVU($1), UNEW(ast::OpGe()), MVU($3)); }
-            | expr TK_LT expr { $$ = new ast::LogicExpr(MVU($1), UNEW(ast::OpLt()), MVU($3)); }
-            | expr TK_GT expr { $$ = new ast::LogicExpr(MVU($1), UNEW(ast::OpGt()), MVU($3)); }
+logic_expr  : expr TK_OR expr { $$ = new ast::LogicExpr(B2U($1), UNEW(ast::OpOr()), B2U($3)); }
+            | expr TK_AND expr { $$ = new ast::LogicExpr(B2U($1), UNEW(ast::OpAnd()), B2U($3)); }
+            | expr TK_EQ expr { $$ = new ast::LogicExpr(B2U($1), UNEW(ast::OpEq()), B2U($3)); }
+            | expr TK_NE expr { $$ = new ast::LogicExpr(B2U($1), UNEW(ast::OpNe()), B2U($3)); }
+            | expr TK_LE expr { $$ = new ast::LogicExpr(B2U($1), UNEW(ast::OpLe()), B2U($3)); }
+            | expr TK_GE expr { $$ = new ast::LogicExpr(B2U($1), UNEW(ast::OpGe()), B2U($3)); }
+            | expr TK_LT expr { $$ = new ast::LogicExpr(B2U($1), UNEW(ast::OpLt()), B2U($3)); }
+            | expr TK_GT expr { $$ = new ast::LogicExpr(B2U($1), UNEW(ast::OpGt()), B2U($3)); }
             ;
 %%
