@@ -1,4 +1,4 @@
-Main := Function(Int) {
+Main := Function(Void) {
     x := 3
     y := 4
     z := 5
@@ -6,5 +6,4 @@ Main := Function(Int) {
     u := x * y + z
     v := x + y * z
     w := u || v
-    return 0
 }

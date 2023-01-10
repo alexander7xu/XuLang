@@ -9,9 +9,13 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
 add_subdirectory("${CMAKE_SOURCE_DIR}/utils")
 add_subdirectory("${CMAKE_SOURCE_DIR}/ast")
 add_subdirectory("${CMAKE_SOURCE_DIR}/parser")
+add_subdirectory("${CMAKE_SOURCE_DIR}/check")
+
+add_executable(lexer.out ./lexer.cc)
+target_link_libraries(lexer.out parser ast utils)
 
 add_executable(ast2json.out ./ast2json.cc)
 target_link_libraries(ast2json.out parser ast utils)
 
-add_executable(lexer.out ./lexer.cc)
-target_link_libraries(lexer.out parser ast utils)
+add_executable(check.out ./check.cc)
+target_link_libraries(check.out check parser ast utils)
