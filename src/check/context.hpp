@@ -2,7 +2,6 @@
 #define _XULANG_SRC_CHECK_CONTEXT_HPP
 
 #include <forward_list>
-#include <map>
 #include <unordered_map>
 
 #include "../utils/log.hpp"
@@ -153,16 +152,18 @@ class Context {
     for (auto it = _cur_block; it != nullptr; it = it->parent) {
       res = std::to_string(it->id) + "." + res;
     }
-    return res.substr(1);
+    return res.substr(1, res.length() - 2);
   }
 
   void PushBlock() {
     _cur_block->children.push_front(
         Block{.parent = _cur_block, .id = ++_cur_block->children_cnt});
     _cur_block = &_cur_block->children.front();
+    // AddThreeAddressCode("__push_block__", "", "", GetBlockId());
   }
 
   void PopBlock() {
+    // AddThreeAddressCode("__pop_block__", "", "", GetBlockId());
     if (_cur_block->parent == nullptr) {
       kLog->Critical({SRC_LOC, "Could not pop the head block"});
       throw;
@@ -177,9 +178,7 @@ class Context {
     }
 
     auto &name = symbol->GetName();
-    auto block_name = '@' + GetBlockId();
-    block_name.pop_back();
-    symbol->_block_name = block_name;
+    symbol->_block_name = '@' + GetBlockId();
     _cur_block->symbol_map[name] = std::move(symbol);
     return *_cur_block->symbol_map[name];
   }
@@ -187,7 +186,7 @@ class Context {
   Symbol *FindSymbol(const std::string &name) const {
     for (auto it = _cur_block; it != nullptr; it = it->parent) {
       auto p = it->symbol_map.find(name);
-      if (p != nullptr) return p->second.get();
+      if (p != it->symbol_map.end()) return p->second.get();
     }
     return nullptr;
   }
@@ -199,10 +198,7 @@ class Context {
                                      const std::string &right,
                                      std::string res = "") {
     auto bid = GetBlockId();
-    if (res == "") {
-      bid.back() = '$';
-      res = bid + std::to_string(++_cur_block->tmp_num);
-    }
+    if (res == "") res = std::to_string(++_cur_block->tmp_num) + '$' + bid;
 
     auto id = "#" + std::to_string(++_three_addr_code_cnt);
     _three_addr_codes.push_front(ThreeAddrCode{

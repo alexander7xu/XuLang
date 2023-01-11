@@ -1,4 +1,4 @@
-main := Function(Void) {
+__main__ := Function(Int) {
     x := 1                          # 创建变量x，Int型，值为1
     y := 2                          # 创建变量y，Int型，值为2
 
@@ -8,12 +8,13 @@ main := Function(Void) {
         } else if (y == 1) {
             z := 4                  # 创建变量z，Int型，值为4
         } else if (y == 2) {
-            x := 42                 # 创建变量x，Int型，值为42；注意作用域不同
+            x := y = 42             # 赋值y为42；创建变量x，Int型，值为y；注意作用域不同
             continue
         } else {
             break
         }
     } else {
-        z := 4
+        return 4
     }
+    return 0
 }

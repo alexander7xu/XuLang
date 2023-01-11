@@ -44,9 +44,10 @@ void VisitorInterface::Visit(class OpRef *) { throw "Unimplemented"; }
 #define _OVERRIDE_LEAF_ACCEPT(LeafClass) \
   void LeafClass::Accept(VisitorInterface *visitor) { visitor->Visit(this); }
 
-#define _OVERRIDE_LEAF_OPERATOR(LeafOperator, name) \
-  _OVERRIDE_LEAF_ACCEPT(LeafOperator)               \
-  const char *LeafOperator::GetName() const { return name; }
+#define _OVERRIDE_LEAF_OPERATOR(LeafOperator, name)          \
+  _OVERRIDE_LEAF_ACCEPT(LeafOperator)                        \
+  const char *LeafOperator::GetName() const { return name; } \
+  const char *const LeafOperator::kBuiltinName = name;
 
 #define _OVERRIDE_LEAF_CREATE(LeafCreate) \
   _OVERRIDE_LEAF_ACCEPT(LeafCreate)       \

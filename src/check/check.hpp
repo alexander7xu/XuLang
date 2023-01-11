@@ -45,15 +45,15 @@ class Check final : private ast::VisitorInterface {
 
  private:
   void MakePrettyResult(decltype(_context.GetCurrentBlock()) &block,
-                        const std::string &bid = ".") {
+                        const std::string &bid = "") {
     for (auto &child : block.children) {
-      MakePrettyResult(child, bid + std::to_string(child.id));
+      MakePrettyResult(child, bid + "." + std::to_string(child.id));
     }
     for (auto &obj : block.symbol_map) {
       auto &symbol = obj.second;
       auto &name = symbol->GetName();
       auto &type = symbol->GetType().GetName();
-      _pretty_result.symbols.push_front({name, type, bid});
+      _pretty_result.symbols.push_front({name, type, bid.length() ? bid : "."});
     }
   }
 

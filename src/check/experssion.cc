@@ -45,12 +45,8 @@ void Check::Visit(ast::Name *name) {
       dynamic_cast<TypeSymbol *>(symbol) != nullptr ? "__type__" : "__load__";
   auto code = &_context.AddThreeAddressCode(
       op, symbol->GetName() + symbol->GetBlockName(), "");
+
   _result.three_addr_code = code;
-
-  if (_result.three_addr_code == nullptr) {
-    return kLog->Critical({SRC_LOC, "Must load or store a name"});
-  }
-
   _result.last_symbol = symbol;
   _result.expr_type = &symbol->GetType();
   _result.status = 0;
@@ -73,13 +69,15 @@ void Check::Visit(ast::BinaryOpExpr *bop_expr) {
 
   if (l_type != builtin_type_symbol::kInt.get() ||
       r_type != builtin_type_symbol::kInt.get()) {
-    return kLog->Critical({SRC_LOC, "Currently only support Int __bop__ Int"});
+    _result.status = -1;
+    return kLog->Critical(
+        {SRC_LOC, "Currently only support Int __bop__ Int, got"});
   }
 
-  auto &code = _context.AddThreeAddressCode(bop_expr->op->GetName(),
+  auto code = &_context.AddThreeAddressCode(bop_expr->op->GetName(),
                                             l_code->res, r_code->res);
 
-  _result.three_addr_code = &code;
+  _result.three_addr_code = code;
   _result.expr_type = builtin_type_symbol::kInt.get();
   _result.status = 0;
   return kLog->Debug({"Done checking bop-expr"});
@@ -101,7 +99,8 @@ void Check::Visit(ast::AssignOpExpr *aop_expr) {
 
   if (l_type != builtin_type_symbol::kInt.get() ||
       r_type != builtin_type_symbol::kInt.get()) {
-    return kLog->Critical({SRC_LOC, "Currently only support Int __bop__ Int"});
+    _result.status = -1;
+    return kLog->Critical({SRC_LOC, "Currently only support Int __aop__ Int"});
   }
 
   if (dynamic_cast<ast::OpAssign *>(aop_expr->op.get()) != nullptr) {
@@ -127,23 +126,23 @@ void Check::Visit(ast::AssignOpExpr *aop_expr) {
 void Check::Visit(ast::LogicExpr *logic_expr) {
   // A+0: (..., "tL")                     # calculate tL
   // B+0: ("__jf__", "tL", "", "B+3")     # goto logic_rt if tL is False
-  // B+1: ("__load__", "tL", "", "tT")    # tT = tL
-  // B+2: ("__jp__", "", "", "C+1")       # goto logic_ed
-  // B+3: ("__loc__", "", "", "logic_rt") #
-  // B+4: (..., "tR")                     # calculate tR
+  // B+1: ("__loc__", "", "", "logic_lt") #
+  // B+2: ("__load__", "tL", "", "tT")    # tT = tL
+  // B+3: ("__jp__", "", "", "C+1")       # goto logic_ed
+  // B+4: ("__loc__", "", "", "logic_rt") #
+  // B+5: (..., "tR")                     # calculate tR
   // C+0: ("__load__", "tR", "", "tT")    # tT = tR
   // C+1: ("__loc__", "", "", "logic_ed") #
 
-  // A+0: ("__loc__", "", "", "and")      #
-  // A+1: (..., "tL")                     # calculate tL
+  // A+0: (..., "tL")                     # calculate tL
   // B+0: ("__jt__", "tL", "", "B+3")     # goto logic_rt if tL is True
-  // B+1: ("__load__", "tL", "", "tmp")   # tmp = tL
-  // B+2: ("__jp__", "", "", "C+1")       # goto logic_ed
-  // B+3: ("__loc__", "", "", "logic_rt") #
-  // B+4: (..., "tR")                     # calculate tR
-  // C+0: ("__load__", "tR", "", "tmp")   # tmp = tR
+  // B+1: ("__loc__", "", "", "logic_lt") #
+  // B+2: ("__load__", "tL", "", "tT")    # tT = tL
+  // B+3: ("__jp__", "", "", "C+1")       # goto logic_ed
+  // B+4: ("__loc__", "", "", "logic_rt") #
+  // B+5: (..., "tR")                     # calculate tR
+  // C+0: ("__load__", "tR", "", "tT")    # tT = tR
   // C+1: ("__loc__", "", "", "logic_ed") #
-  // C+2: ("__load__", "tmp", "", "tT")   # tT = tmp
 
   // __other__
   // A+0: (..., "tL")                     # calculate tL
@@ -164,17 +163,19 @@ void Check::Visit(ast::LogicExpr *logic_expr) {
     auto jmp_op = dynamic_cast<ast::OpOr *>(logic_expr->op.get()) != nullptr
                       ? "__jf__"
                       : "__jt__";
-    auto jmpc_right =  // B+0
+    auto jmpc2right =  // B+0
         &_context.AddThreeAddressCode(jmp_op, l_code->res, "", "logic_rt");
-    auto load_left =  // B+1
-        &_context.AddThreeAddressCode("__load__", l_code->res, "");
-    const auto &target_tmp = load_left->res;  // tT
-    auto jmp_ed =                             // B+2
-        &_context.AddThreeAddressCode("__jp__", "", "", "logic_ed");
+    _context.AddThreeAddressCode("__loc__", "", "", "logic_lt");  // B+1
 
-    auto loc_right =  // B+3
+    auto load_left =  // B+2
+        &_context.AddThreeAddressCode("__copytmp__", l_code->res, "");
+    const auto &target_tmp = load_left->res;  // tT
+    auto jmp2ed =                             // B+3
+        &_context.AddThreeAddressCode("__jp__", "", "", "?");
+
+    auto loc_right =  // B+4
         &_context.AddThreeAddressCode("__loc__", "", "", "logic_rt");
-    jmpc_right->res = loc_right->id;
+    jmpc2right->res = loc_right->id;
 
     logic_expr->right->Accept(this);  // calculate tR
     if (_result.status != 0) return;
@@ -189,13 +190,12 @@ void Check::Visit(ast::LogicExpr *logic_expr) {
     }
 
     // auto load_right = & // C+0
-    _context.AddThreeAddressCode("__load__", r_code->res, "", target_tmp);
+    _context.AddThreeAddressCode("__copytmp__", r_code->res, "", target_tmp);
     auto loc_end =  // C+1
         &_context.AddThreeAddressCode("__loc__", "", "", "logic_ed");
-    jmp_ed->res = loc_end->id;
+    jmp2ed->res = loc_end->id;
 
-    code =  // C+2
-        &_context.AddThreeAddressCode("__load__", target_tmp, "");
+    code = load_left;
   } else {
     logic_expr->right->Accept(this);  // calculate tR
     if (_result.status != 0) return;

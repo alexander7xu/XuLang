@@ -1,9 +1,9 @@
-Main := Function(Void) {
+__main__ := Function(Void) {
     x := 3
     y := 4
     z := 5
 
     u := x * y + z
     v := x + y * z
-    w := u || v
+    # w := u || v
 }

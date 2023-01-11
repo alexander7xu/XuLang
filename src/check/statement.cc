@@ -6,12 +6,15 @@ void Check::Visit(ast::Module *module) {
   kLog->Debug({"Checking module:", module->filename});
   _result.status = -1;
 
+  _context.AddThreeAddressCode("__begmodule__", "", "", module->filename);
   _context.PushBlock();
+
   for (auto &obj : module->objs) {
     obj->Accept(this);
     if (_result.status != 0) return;
   }
   _context.PopBlock();
+  _context.AddThreeAddressCode("__endmodule__", "", "", module->filename);
 
   _result.status = 0;
   return kLog->Debug({"Done checking module:", module->filename});
@@ -65,9 +68,13 @@ void Check::Visit(ast::Function *func) {
     return kLog->Error(
         {"Function must defined with one unamed arg as return type"});
   }
-  if (func->args->type_args.size() != 0 || func->args->keywords.size() != 0) {
-    return kLog->Error({"Function args currently unsupported"});
+  if (func->args->keywords.size() != 0) {
+    return kLog->Critical({SRC_LOC, "Default args currently unsupported"});
   }
+
+  auto bid = func->GetId() + '@' + _context.GetBlockId();
+  _context.AddThreeAddressCode("__begfunc__", "", "", bid);
+  _context.PushBlock();
 
   _result.last_symbol = nullptr;
   func->args->unameds.front()->Accept(this);
@@ -79,35 +86,60 @@ void Check::Visit(ast::Function *func) {
         {"Arg0 of function declation except to be a TypeSymbol"});
   }
 
-  _result.last_symbol =
+  auto func_symbol =
       &_context.AddSymbol(FunctionSymbol::New(func->GetId(), *ret_type));
 
-  _context.PushBlock();
+  for (auto &arg : func->args->type_args) {
+    auto &arg_name = std::get<0>(arg);
+    auto &type_name = std::get<1>(arg);
+    type_name->Accept(this);
+    if (_result.status != 0) return;
+    auto type = dynamic_cast<TypeSymbol *>(_result.last_symbol);
+    if (type == nullptr) {
+      _result.status = -1;
+      return kLog->Error({"Arg1 Type except to be a TypeSymbol"});
+    }
+    auto sym = &_context.AddSymbol(ObjectSymbol::New(*arg_name, *type));
+    _context.AddThreeAddressCode("__arg__", "",
+                                 type->GetName() + type->GetBlockName(),
+                                 sym->GetName() + sym->GetBlockName());
+  }
+
+  _context.AddThreeAddressCode("__begfunc_body__", "", "", bid);
+
+  decltype(ExtractCtrlFlowCodes<ast::Return>()) ret_stmts;
   for (auto &stmt : func->body->statements) {
     stmt->Accept(this);
 
-    ExtractCtrlFlowCodes<ast::Return>();
+    for (auto &ret : ExtractCtrlFlowCodes<ast::Return>()) ret.second->res = bid;
     // TODO: Parse return stmt here
     if (_result.ctrl_flow_codes.size() != 0) {
       _result.status = -1;
       return kLog->Error({"Control flow statement not allowed here"});
     }
   }
-  _context.PopBlock();
 
+  _context.PopBlock();
+  auto end_func = &_context.AddThreeAddressCode("__endfunc__", "", "", bid);
+
+  _result.last_symbol = func_symbol;
+  _result.three_addr_code = end_func;
+  _result.expr_type = nullptr;
   _result.status = 0;
   return kLog->Debug({"Done checking function"});
 }
 
 void Check::Visit(ast::If *if_stmt) {
-  // A+0: (__loc__, "", "", "if")         #
-  // A+1: (..., "tTest")                  # calculate tTest
+  // A-1: ("__loc__", "", "", "begif")    #
+  // A+0: (..., "tTest")                  # calculate tTest
   // B+0: ("__jf__", "tTest", "", "C+1")  # goto else if tTest is False
-  // B+1: (..., "tBody")                  # calculate tBody
+  // B+1: ("__loc__", "", "", "then")     #
+  // B+2: (..., "tBody")                  # calculate tBody
   // C+0: ("__jp__", "", "", "D+0")       # goto endif
   // C+1: ("__loc__", "", "", "else")     #
   // C+2: (..., "tOrelse")                # caculate tOrelse
-  // D+0: ("__loc__", "", "", "endif")    #
+  // D+0: ("__jp__", "", "", "D+1")       # goto endif
+  // D+1: ("__loc__", "", "", "endif")    #
 
   kLog->Debug({"Checking if-stmt"});
   _result.status = -1;
@@ -121,33 +153,36 @@ void Check::Visit(ast::If *if_stmt) {
   }
 
   // auto loc_beg = & // A+0
-  _context.AddThreeAddressCode("__loc__", "", "", "begif");
+  // _context.AddThreeAddressCode("__loc__", "", "", "begif");
   if_stmt->test->Accept(this);  // calculate tTest
   if (_result.status != 0) return;
 
   auto test_code = _result.three_addr_code;
-  auto jmpc_orelse =  // B+0
+  auto jmpc2orelse =  // B+0
       &_context.AddThreeAddressCode("__jf__", test_code->res, "", "?");
+  _context.AddThreeAddressCode("__loc__", "", "", "then");  // B+1
 
   if_stmt->body->Accept(this);  // calculate tBody
   if (_result.status != 0) return;
 
-  auto jmp_end =  // C+0
-      &_context.AddThreeAddressCode("__jp__", test_code->res, "", "?");
+  auto jmp2end =  // C+0
+      &_context.AddThreeAddressCode("__jp__", "", "", "?");
   auto loc_else =  // C+1
-      &_context.AddThreeAddressCode("__loc__", test_code->res, "", "else");
-  jmpc_orelse->res = loc_else->id;
+      &_context.AddThreeAddressCode("__loc__", "", "", "else");
+  jmpc2orelse->res = loc_else->id;
 
   if (if_stmt->orelse != nullptr) {
     if_stmt->orelse->Accept(this);  // caculate tOrelse
     if (_result.status != 0) return;
   }
 
-  auto loc_end =  // D+0
+  auto orelse2end =  // D+0
+      &_context.AddThreeAddressCode("__jp__", "", "", "?");
+  auto loc_end =  // D+1
       &_context.AddThreeAddressCode("__loc__", "", "", "endif");
-  jmp_end->res = loc_end->id;
+  orelse2end->res = jmp2end->res = loc_end->id;
 
-  _result.three_addr_code = jmp_end;
+  _result.three_addr_code = jmp2end;
   _result.expr_type = nullptr;
   _result.last_symbol = nullptr;
   _result.status = 0;
@@ -159,6 +194,7 @@ void Check::Visit(ast::Break *brk) {
   _result.status = -1;
 
   auto code = &_context.AddThreeAddressCode("__jp__", "", "", "?");
+  _context.AddThreeAddressCode("__loc__", "", "", "break");
   _result.ctrl_flow_codes.push_back({*brk, code});
 
   _result.status = 0;
@@ -170,53 +206,76 @@ void Check::Visit(ast::Continue *ctn) {
   _result.status = -1;
 
   auto code = &_context.AddThreeAddressCode("__jp__", "", "", "?");
+  _context.AddThreeAddressCode("__loc__", "", "", "continue");
   _result.ctrl_flow_codes.push_back({*ctn, code});
 
   _result.status = 0;
   return kLog->Debug({"Done checking break-stmt"});
 }
 
-void Check::Visit(ast::Return *) {
-  kLog->Critical({SRC_LOC, "Unimplemented"});
+void Check::Visit(ast::Return *ret) {
+  kLog->Debug({"Checking return-stmt"});
   _result.status = -1;
+
+  ThreeAddrCode *ret_val = nullptr;
+  if (ret->expr != nullptr) {
+    ret->expr->Accept(this);
+    ret_val = _result.three_addr_code;
+  }
+
+  auto code = &_context.AddThreeAddressCode(
+      "__ret__", ret_val == nullptr ? "" : ret_val->res, "", "_");
+
+  _result.ctrl_flow_codes.push_back({*ret, code});
+  _result.three_addr_code = code;
+  _result.expr_type = nullptr;
+  _result.status = 0;
+  return kLog->Debug({"Done checking return-stmt"});
 }
 
 void Check::Visit(ast::While *while_stmt) {
   // A-1: ("__loc__", "", "", "while")    #
-  // A+0: ("__jp__", "", "", "C+0")       # goto test
-  // A+1: ("__loc__", "", "", "body")     #
+  // A+0: ("__jp__", "", "", "C+1")       # goto test
+  // A+1: ("__loc__", "", "", "do")       #
   // A+2: (..., "tBody_0")                # calculate tBody
-  // B+0: ("__jp__", "", "", "E+0")       #   assume break: goto endwhile
-  // B+1: ("__jp__", "", "", "C+0")       #   assume continue: goto test
+  // B+0: ("__jp__", "", "", "E+1")       #   assume break: goto endwhile
+  // B+1: ("__jp__", "", "", "C+1")       #   assume continue: goto test
   // B+2: (..., "tBody_1")                # calculate tBody
-  // C+0: ("__loc__", "", "", "test")     #
-  // C+1  (..., "tTest")                  # calculate tTest
+  // C+0: ("__jp__", "", "", "C+1")       # goto test
+  // C+1: ("__loc__", "", "", "test")     #
+  // C+2: (..., "tTest")                  # calculate tTest
   // D+0: ("__jt__", "", "", "A+1")       # goto body if tTest is true
-  // D+1: (..., "tOrelse")                # calculate orelse
-  // E+0: ("__loc__", "", "", "endwhile") #
+  // D+1: ("__loc__", "", "", "else")     #
+  // D+2: (..., "tOrelse")                # calculate orelse
+  // E+0: ("__jp__", "", "", "E+1")       # goto endwhile
+  // E+1: ("__loc__", "", "", "endwhile") #
 
   kLog->Debug({"Checking while-stmt"});
   _result.status = -1;
 
-  // auto loc_beg = & // E+0
-  _context.AddThreeAddressCode("__loc__", "", "", "begwhile");
-  auto jmp_test =  // A+0
+  // auto loc_beg = & // A-1
+  // _context.AddThreeAddressCode("__loc__", "", "", "begwhile");
+  auto jmp2test =  // A+0
       &_context.AddThreeAddressCode("__jp__", "", "", "?");
-  auto loc_body =  // A+1
-      &_context.AddThreeAddressCode("__loc__", "", "", "body");
+  auto loc_do =  // A+1
+      &_context.AddThreeAddressCode("__loc__", "", "", "do");
 
   while_stmt->body->Accept(this);  // calculate tBody
   if (_result.status != 0) return;
 
-  auto loc_test =  // C+0
+  auto body2test =  // C+0
+      &_context.AddThreeAddressCode("__jp__", "", "", "?");
+  auto loc_test =  // C+1
       &_context.AddThreeAddressCode("__loc__", "", "", "test");
-  jmp_test->res = loc_test->id;
+  body2test->res = jmp2test->res = loc_test->id;
 
   while_stmt->test->Accept(this);  // calculate tTest
   if (_result.status != 0) return;
+  auto test_code = _result.three_addr_code;
 
   // auto jmp2body = & // D+0
-  _context.AddThreeAddressCode("__jt__", "", "", loc_body->id);
+  _context.AddThreeAddressCode("__jt__", test_code->res, "", loc_do->id);
+  _context.AddThreeAddressCode("__loc__", "", "", "else");
 
   auto break_stmts = ExtractCtrlFlowCodes<ast::Break>();
   auto continue_stmts = ExtractCtrlFlowCodes<ast::Continue>();
@@ -226,8 +285,11 @@ void Check::Visit(ast::While *while_stmt) {
     if (_result.status != 0) return;
   }
 
-  auto loc_end =  // E+0
+  auto orelse2end = // E+0
+      &_context.AddThreeAddressCode("__jp__", "", "", "?");
+  auto loc_end =  // E+1
       &_context.AddThreeAddressCode("__loc__", "", "", "endwhile");
+  orelse2end->res = loc_end->id;
 
   // Set jump target of break and continue statements
   for (auto &stmt : break_stmts) stmt.second->res = loc_end->id;

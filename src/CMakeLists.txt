@@ -19,3 +19,8 @@ target_link_libraries(ast2json.out parser ast utils)
 
 add_executable(check.out ./check.cc)
 target_link_libraries(check.out check parser ast utils)
+
+find_package(LLVM REQUIRED CONFIG)
+llvm_map_components_to_libnames(LLVM_LIBS core passes)
+add_executable(codegen.out ./codegen.cc ./codegen/codegen.cc)
+target_link_libraries(codegen.out check parser ast utils ${LLVM_LIBS})

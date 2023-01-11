@@ -1,8 +1,9 @@
-#include "./check/check.hpp"
+#include "./codegen/codegen.hpp"
 
 #include <iostream>
 #include <vector>
 
+#include "./check/check.hpp"
 #include "./parser/parser.hpp"
 
 static std::string Fill(const std::string &text, int cnt, char c = ' ') {
@@ -24,10 +25,11 @@ int main(int argc, char *argv[]) {
     if (!check(*parser.GetAst())) return -1;
   }
 
-  auto res = check.MakePrettyResult();
+  auto check_res = check.MakePrettyResult();
+
   std::string symbols = "Symbols\n" + Fill("name", 40) + Fill("type", 40) +
                         Fill("block", 20) + "\n";
-  for (auto &sym : res.symbols) {
+  for (auto &sym : check_res.symbols) {
     auto &name = std::get<0>(sym);
     auto &type = std::get<1>(sym);
     auto &bid = std::get<2>(sym);
@@ -35,12 +37,16 @@ int main(int argc, char *argv[]) {
   }
 
   std::string codes = "Three Address Codes\n";
-  for (auto &code : res.codes) {
+  for (auto &code : check_res.codes) {
     codes += Fill(code.op, 20) + Fill(code.left, 20) + Fill(code.right, 20) +
              Fill(code.res, 20) + Fill(code.id, 20) + "\n";
   }
 
-  std::cout << symbols << std::endl << std::endl;
-  std::cout << codes << std::endl << std::endl;
+  // std::cout << symbols << std::endl << std::endl;
+  // std::cout << codes << std::endl << std::endl;
+
+  auto modules = codegen::CodeGen(check_res.codes, true);
+  codegen::CodePrint(modules);
+
   return 0;
 }

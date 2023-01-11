@@ -1,0 +1,14 @@
+Fib := Function(Int, n:Int) {
+    res := 0
+    a := 1
+    b := 0
+    
+    while (n > 0) {
+        res = a + b
+        a = b
+        b = res
+        n = n - 1
+    }
+    
+    return res
+}

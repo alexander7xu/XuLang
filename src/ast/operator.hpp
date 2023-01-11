@@ -10,6 +10,7 @@ namespace ast {
 using utils::Uptr;
 
 class Expression;
+class Name;
 
 class Operator : public Node {
  public:
@@ -30,6 +31,7 @@ class CallOperator final : public VargOperator {
   std::list<Uptr<Expression>> unameds;
   std::list<std::tuple<Uptr<TextType>, Uptr<Name>>> type_args;
   std::list<std::tuple<Uptr<TextType>, Uptr<Expression>>> keywords;
+  static const char *const kBuiltinName;
 
   CallOperator() = default;
   virtual const char *GetName() const override;
@@ -52,6 +54,8 @@ class SubscriptOperator final : public VargOperator {
   using SubscriptArg =
       std::tuple<Uptr<Expression>, Uptr<Expression>, Uptr<Expression>>;
   std::list<Uptr<SubscriptArg>> dims;
+  static const char *const kBuiltinName;
+
   SubscriptOperator() = default;
   virtual const char *GetName() const override;
   virtual void Accept(VisitorInterface *) override;
@@ -64,6 +68,7 @@ class SubscriptOperator final : public VargOperator {
 #define _OP_CHILD_CLASS(class_name, parent)                  \
   class_name final : public parent {                         \
    public:                                                   \
+    static const char *const kBuiltinName;                   \
     class_name() = default;                                  \
     virtual const char *GetName() const override;            \
     virtual void Accept(VisitorInterface *visitor) override; \
